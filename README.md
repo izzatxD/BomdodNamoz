@@ -57,7 +57,9 @@ bomdodnamozappbot/
   (4 shakli bilan) va 3 ta misol so'z chiqadi; dars tugaganda arab tili darslari bilan bir xil Nur beriladi
 - **Namoz vaqtlari** — 6 ta vaqt va hijriy sana. **GPS** bo'yicha yoki 13 ta shahardan. Ilovaning o'zida,
   O'zbekiston musulmonlari idorasi usuli bilan hisoblanadi — internet kerak emas, rasmiy taqvim bilan 99.7% mos
-- **Reyting (Nur)** — zikr, tasbih, qazo, dars va kunlik vazifalar uchun ball; daraja (Sham → Chiroq → Mash'al → Yulduz → Oy → Quyosh), 12 ta nishon, haftalik ustunli grafik.
+- **Reyting (Nur)** — zikr, tasbih, qazo, dars va kunlik vazifalar uchun ball. Kunlik chegaralar:
+  kunlik vazifalar 200 (eng katta — odatni o'sha shakllantiradi), tasbih 150, qazo 150, ilm 120, zikr 118 — jami 738.
+  Daraja (Sham → Chiroq → Mash'al → Yulduz → Oy → Quyosh), 12 ta nishon, haftalik ustunli grafik.
   Musobaqa: **liga** (bir darajadagilar), **jamoa** (Telegram guruhi), **do'stlar**. Har dushanba hisob nolga tushadi
 - Progress **Telegram CloudStorage**'da saqlanadi — foydalanuvchining barcha qurilmalarida sinxron; brauzerda test qilganda localStorage ishlaydi
 - Telegram mavzusiga (dark/light) moslashadi, orqaga tugmasi, haptic, tasdiqlash dialoglari
@@ -324,6 +326,17 @@ Musobaqa (liga, jamoa, do'stlar) server ulanganda yonadi — yuqoridagi **«Inte
 - Eslatmani foydalanuvchi shahridagi bomdod vaqtiga bog'lash
 - Ramazon uchun maxsus tadbirlar va jamoaviy maqsad («bu hafta jamiyat N Nur to'pladi» kengaytmasi)
 - 1v1 duel: «7 kun — kim ko'proq qazo o'qiydi?»
+
+## Sinovlar
+
+```bash
+node test/store.test.js    # ma'lumot yo'qolmasligi (CloudStorage 4KB bo'linishi)
+node test/nur.test.js      # ball tizimi: chegaralar, balans, streak, darajalar
+```
+
+Ikkalasi ham tashqi kutubxonasiz, faqat Node kerak. `nur.test.js` balansni ham tekshiradi —
+vaznlarni o'zgartirsangiz, biror kategoriya haddan tashqari ustun bo'lib ketmaganini aytadi.
+`nur.js` dagi `CAP` va `api.py` dagi `CAPS` doim bir xil bo'lishi shart.
 
 ## Namoz vaqtlari
 

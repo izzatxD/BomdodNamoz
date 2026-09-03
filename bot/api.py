@@ -28,8 +28,10 @@ from aiohttp import web
 import db
 
 # webapp/nur.js dagi CAP bilan BIR XIL bo'lishi shart
-CAPS = {"zikr": 120, "tasbih": 200, "qazo": 300, "ilm": 120, "odat": 110}
-IMPORT_CAP = 5000        # birinchi ulanishda ilovadan qabul qilinadigan avvalgi jami Nur (maksimum)
+CAPS = {"zikr": 118, "tasbih": 150, "qazo": 150, "ilm": 120, "odat": 200}
+IMPORT_CAP = 50000       # birinchi ulanishda ilovadan qabul qilinadigan avvalgi jami Nur (maksimum).
+                         # Bir martalik: serverga o'tishda foydalanuvchi progressi kesilmasin.
+                         # Firibgarlikdan himoya kunlik CAPS orqali ishlaydi — u har sinxronlashda qo'llanadi.
 MAX_DAYS_BACK = 7        # necha kun orqaga natija qabul qilinadi
 SYNC_MIN_INTERVAL = 3.0  # soniya — bitta foydalanuvchi uchun /sync oralig'i
 _last_sync: dict[int, float] = {}

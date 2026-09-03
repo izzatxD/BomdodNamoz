@@ -9,10 +9,13 @@
 window.Nur = (function () {
   const Z = window.ZIKR_DATA, A = window.ARABIC_DATA;
 
-  // Kunlik chegaralar (kategoriya bo'yicha) — davomiylik hajmdan muhim, "farm" qilib bo'lmaydi
-  const CAP = { zikr: 120, tasbih: 200, qazo: 300, ilm: 120, odat: 110 };
+  // Kunlik chegaralar (kategoriya bo'yicha) — davomiylik hajmdan muhim, "farm" qilib bo'lmaydi.
+  // Tamoyil: eng katta ulush kunlik vazifalarga (odat dasturi) tegishli, chunki odatni o'sha shakllantiradi.
+  // zikr: 118 — barcha tong (14) va tun (15) zikrlarining aniq qiymati, ortiga joy qoldirilmagan.
+  const CAP = { zikr: 118, tasbih: 150, qazo: 150, ilm: 120, odat: 200 };
   // Vaznlar
-  const W = { zikr: 2, zikrFull: 30, tasbih33: 5, qazo: 15, dars: 40, odat: 50, streak: 2, streakMax: 60 };
+  // odat: bazaviy 60 + streak bonusi (kuniga 4, 35 kunda 140 ga to'yinadi) = 200
+  const W = { zikr: 2, zikrFull: 30, tasbih33: 5, qazo: 15, dars: 40, odat: 60, streak: 4, streakMax: 140 };
 
   // Darajalar — jami Nur bo'yicha (ligada ham shu daraja bo'yicha guruhlanadi)
   const LEVELS = [
