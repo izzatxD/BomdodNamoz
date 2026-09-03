@@ -167,21 +167,33 @@ window.App = (function () {
     return { now: "xufton", next: "bomdod", at: m.bomdod, left: 24 * 60 - nowMin + m.bomdod, tomorrow: true };
   }
 
-  // Hero: chapda keyingi namoz (kun bo'yi foydali), o'ngda hozirgi holat
-  function renderHero(t, s) {
-    $("#next-label").textContent = s.tomorrow ? `Keyingi · ${NAMES[s.next]} (ertaga)` : `Keyingi · ${NAMES[s.next]}`;
-    $("#next-time").textContent = t[s.next];
-    const side = $("#side-time"), lab = $("#side-label");
-    if (s.now === "bomdod") { lab.textContent = "Quyosh chiqishi"; side.textContent = t.quyosh; }
-    else if (s.now) { lab.textContent = `Hozir · ${NAMES[s.now]}`; side.textContent = t[s.now]; }
-    else { lab.textContent = "Bomdod o'tdi"; side.textContent = t.bomdod; }
+  const PRAYER_ICON = { bomdod: "dawn", quyosh: "sunrise", peshin: "sun", asr: "sun", shom: "sunset", xufton: "moon" };
+  // Sanoq: 1 soatdan ko'p bo'lsa H:MM:SS, aks holda MM:SS
+  function fmtClock(sec) {
+    sec = Math.max(0, sec);
+    const h = Math.floor(sec / 3600), m = Math.floor(sec / 60) % 60, s = sec % 60;
+    const p = (n) => String(n).padStart(2, "0");
+    return h ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
   }
 
-  // Hero'dagi 6 ta vaqt; hozir davom etayotgan namoz vaqti yoritiladi
+  // Hero: keyingi namozgacha jonli sanoq
+  function renderHero(t, s, secLeft) {
+    $("#next-label").textContent = s.now === "bomdod" ? "Quyosh chiqishigacha" : `${NAMES[s.next]}gacha`;
+    $("#countdown").textContent = fmtClock(secLeft);
+    $("#next-at").textContent = s.now
+      ? `${NAMES[s.now]} vaqti · ${NAMES[s.next]} ${t[s.next]}${s.tomorrow ? " (ertaga)" : ""}`
+      : `${NAMES[s.next]} ${t[s.next]}`;
+  }
+
+  // Hero'dagi 6 ta vaqt; hozir davom etayotgan namoz vaqti ajratib ko'rsatiladi
   function renderAllTimes(t, s) {
     const el = $("#times-all"); if (!el || !t) return;
     el.innerHTML = Object.keys(NAMES).map((k) =>
-      `<div class="${k === s.now ? "now" : ""} ${k === s.next ? "next" : ""}"><small>${NAMES[k]}</small><b>${t[k]}</b></div>`).join("");
+      `<div class="${k === s.now ? "now" : ""}">
+         <small>${NAMES[k]}</small>
+         ${Icons.get(PRAYER_ICON[k], 16)}
+         <b>${t[k]}</b>
+       </div>`).join("");
   }
 
   // ---------- joylashuv (GPS) ----------
@@ -240,23 +252,25 @@ window.App = (function () {
     const tick = () => {
       if (Store.today() !== lastDay) return loadPrayerTimes();   // yarim tun o'tdi — yangi kunning vaqtlari
       if (!lastTimes) return;
-      const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
-      const s = prayerState(lastTimes, nowMin);
-      renderHero(lastTimes, s);
+      const now = new Date();
+      const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const s = prayerState(lastTimes, Math.floor(nowSec / 60));
+      let left = s.at * 60 - nowSec;
+      if (left < 0) left += 24 * 3600;                          // ertangi bomdod
+      renderHero(lastTimes, s, left);
       renderAllTimes(lastTimes, s);
-      // Har doim keyingi voqeagacha qolgan vaqt — kun bo'yi foydali
-      const msg = s.now === "bomdod"
-        ? `Bomdod vaqti — quyosh chiqishigacha ${fmt(s.left)}`
-        : s.now
-          ? `${NAMES[s.now]} vaqti — ${NAMES[s.next]}gacha ${fmt(s.left)}`
-          : `${NAMES[s.next]}gacha ${fmt(s.left)}`;
-      $("#countdown").textContent = msg;
-      $("#countdown").classList.toggle("live", !!s.now);        // namoz vaqti davom etayotganda yashil nuqta
-      $("#countdown").classList.toggle("soon", !s.now && s.left <= 30);
+      const el = $("#hero-count-box") || $("#countdown").parentElement;
+      el.classList.toggle("live", !!s.now);                     // namoz vaqti davom etyapti
+      el.classList.toggle("soon", left <= 15 * 60);             // 15 daqiqadan kam qoldi
     };
-    tick(); countdownTimer = setInterval(tick, 30000);
+    tick();
+    countdownTimer = setInterval(tick, 1000);                   // sanoq soniyalab yuradi
   }
-  function fmt(min) { const h = Math.floor(min / 60), m = min % 60; return h ? `${h} soat ${m} daqiqa` : `${m} daqiqa`; }
+  // Ilova fonda turganda sanoqni to'xtatamiz — batareyani bekorga sarflamaslik uchun
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) clearInterval(countdownTimer);
+    else if (lastTimes) { if (Store.today() !== lastDay) loadPrayerTimes(); else startCountdown(); }
+  });
 
   // ---------- qadam-baqadam ----------
   function renderNamoz() {

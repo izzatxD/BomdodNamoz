@@ -39,6 +39,7 @@ window.Icons = (function () {
     eyeoff:   '<path d="M3 3l18 18"/><path d="M10.5 6.2A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a15 15 0 0 1-3.2 3.6"/><path d="M6.6 6.6C4 8.4 3 12 3 12s4 6 9 6c1.3 0 2.5-.3 3.6-.8"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>',
     // video / admin
     drop:     '<path d="M12 3s6 6.5 6 10.5a6 6 0 0 1-12 0C6 9.5 12 3 12 3z"/>',
+    dawn:     '<path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M5.6 8.6l1.4 1.4"/><path d="M18.4 8.6L17 10"/>',
     sunset:   '<path d="M12 11V3"/><path d="M9 6l3 3 3-3"/><path d="M5 13l1.5-1.5"/><path d="M19 13l-1.5-1.5"/><path d="M3 18h18"/><path d="M7 18a5 5 0 0 1 10 0"/>',
     plus:     '<path d="M12 5v14"/><path d="M5 12h14"/>',
     edit:     '<path d="M4 20h4l10-10-4-4L4 16z"/><path d="m14 6 4 4"/>',

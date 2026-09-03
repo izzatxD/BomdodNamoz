@@ -501,15 +501,23 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .lt-info .forms { margin: 8px 0 0; }
 
 /* ---------- hero: barcha namoz vaqtlari ---------- */
-.hero-all { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.18); }
-.hero-all div { text-align: center; border-radius: 10px; padding: 4px 0 3px; }
-.hero-all div.now { background: rgba(255,255,255,.14); }
-.hero-all small { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: .05em; opacity: .75; font-weight: 700; }
+/* keyingi namozgacha jonli sanoq */
+.hero-count { margin-top: 16px; }
+.hero-count-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .85; font-weight: 700; }
+.hero-count-val { font-size: 46px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 2px 0 3px; }
+.hero-count-sub { font-size: 12.5px; opacity: .85; font-weight: 500; min-height: 17px; }
+.hero-count.live .hero-count-label::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #7CFFC4; margin-right: 7px; vertical-align: middle; animation: pulse 1.6s infinite; }
+.hero-count.soon .hero-count-val { color: #FFD75E; }
+
+/* kunning 6 ta vaqti — hozirgisi ajratilgan */
+.hero-all { display: grid; grid-template-columns: repeat(6, 1fr); gap: 3px; margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.18); }
+.hero-all div { text-align: center; border-radius: 12px; padding: 6px 0 5px; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.hero-all div.now { background: rgba(255,255,255,.18); }
+.hero-all small { font-size: 10.5px; letter-spacing: .01em; opacity: .8; font-weight: 700; }
+.hero-all .ic { opacity: .75; }
 .hero-all b { font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.hero-all div.now small, .hero-all div.now .ic { opacity: 1; }
 .hero-all div.now b { color: #7CFFC4; }
 .hero-city.gps { background: rgba(124,255,196,.18); border-color: rgba(124,255,196,.35); }
 
 /* keyingi namoz — 6 ta vaqt qatorida ajratib ko'rsatiladi */
-.hero-all div.next b { color: rgba(255,255,255,.95); }
-.hero-all div.next small { opacity: 1; }
-.hero-countdown.soon::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #FFD75E; margin-right: 7px; }
