@@ -47,7 +47,8 @@ import db  # noqa: E402
 import vaqt  # noqa: E402
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
-WEBAPP_URL = os.getenv("WEBAPP_URL", "")  # masalan: https://username.github.io/bomdodnamozappbot/
+# Mini App manzili. Ko'rsatilmasa — shu repozitoriyning GitHub Pages manzili.
+WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip() or "https://izzatxd.github.io/BomdodNamoz/"
 TZ = ZoneInfo(os.getenv("TZ", "Asia/Tashkent"))
 MORNING_HOUR = int(os.getenv("MORNING_HOUR", "6"))    # tong zikri eslatmasi (soat)
 EVENING_HOUR = int(os.getenv("EVENING_HOUR", "18"))   # tun zikri eslatmasi (soat)
@@ -60,10 +61,31 @@ ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split("
 BOT_USERNAME = ""  # main() da to'ldiriladi
 BACKUP_DAY = os.getenv("BACKUP_DAY", "mon")  # haftalik baza zaxirasi adminga yuboriladigan kun (mon..sun, "" — o'chiq)
 
-if not BOT_TOKEN or not WEBAPP_URL:
-    raise SystemExit("BOT_TOKEN va WEBAPP_URL ni .env faylida ko'rsating (.env.example ga qarang)")
+if not BOT_TOKEN:
+    raise SystemExit(
+        "\n"
+        "  BOT_TOKEN ko'rsatilmagan — bot ishga tushmaydi.\n"
+        "\n"
+        "  Railway: servis → Variables → New Variable:\n"
+        "      BOT_TOKEN = @BotFather bergan token\n"
+        "\n"
+        "  Ixtiyoriy (kerak bo'lsa):\n"
+        "      ADMIN_IDS  = Telegram ID ingiz (botga /id yozing) — /stat, /backup va video paneli uchun\n"
+        f"      WEBAPP_URL = Mini App manzili (hozir: {WEBAPP_URL})\n"
+        "\n"
+        "  Lokal ishlatish uchun: bot/.env faylini .env.example dan nusxalang.\n"
+    )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+
+if not db.DATA_DIR_PERSISTENT:
+    logging.warning(
+        "DIQQAT: doimiy disk topilmadi, ma'lumot %s da saqlanmoqda. "
+        "Hostingda bu HAR DEPLOY'DA O'CHADI — Railway'da Volume qo'shing (mount path: /data).",
+        db.DATA_DIR,
+    )
+if not ADMIN_IDS:
+    logging.warning("ADMIN_IDS bo'sh — /stat, /backup va ilovadagi video paneli hech kimga ochiq emas.")
 router = Router()
 
 # Shaharlar — rasmiy taqvimda shu hudud uchun ishlatiladigan uzunlik (webapp/data.js bilan BIR XIL).

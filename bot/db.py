@@ -14,9 +14,24 @@ import time
 from datetime import date, timedelta
 from pathlib import Path
 
-# Ma'lumotlar papkasi. Railway'da doimiy disk (volume) — masalan /data — DATA_DIR env orqali beriladi;
-# bo'lmasa bot/ papkasi. Volume'siz har deploy'da baza yo'qoladi!
-DATA_DIR = Path(os.getenv("DATA_DIR") or Path(__file__).parent)
+# Ma'lumotlar papkasi. Tartib:
+#   1) DATA_DIR muhit o'zgaruvchisi (aniq ko'rsatilgan bo'lsa)
+#   2) /data — Railway volume odatda shu yerga ulanadi; mavjud va yoziladigan bo'lsa o'zi topiladi
+#   3) bot/ papkasi — lokal ishlash uchun. Hostingda bu VAQTINCHALIK: har deploy'da baza yo'qoladi!
+def _pick_data_dir() -> tuple[Path, bool]:
+    """(papka, doimiymi) — doimiy bo'lmasa bot ishga tushganda ogohlantiradi."""
+    env = os.getenv("DATA_DIR")
+    if env:
+        p = Path(env)
+        p.mkdir(parents=True, exist_ok=True)
+        return p, True
+    vol = Path("/data")
+    if vol.is_dir() and os.access(vol, os.W_OK):
+        return vol, True
+    return Path(__file__).parent, False
+
+
+DATA_DIR, DATA_DIR_PERSISTENT = _pick_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 DB_FILE = DATA_DIR / "reyting.db"
 
