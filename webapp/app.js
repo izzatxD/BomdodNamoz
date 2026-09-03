@@ -177,12 +177,9 @@ window.App = (function () {
   }
 
   // Hero: keyingi namozgacha jonli sanoq
-  function renderHero(t, s, secLeft) {
+  function renderHero(s, secLeft) {
     $("#next-label").textContent = s.now === "bomdod" ? "Quyosh chiqishigacha" : `${NAMES[s.next]}gacha`;
     $("#countdown").textContent = fmtClock(secLeft);
-    $("#next-at").textContent = s.now
-      ? `${NAMES[s.now]} vaqti · ${NAMES[s.next]} ${t[s.next]}${s.tomorrow ? " (ertaga)" : ""}`
-      : `${NAMES[s.next]} ${t[s.next]}`;
   }
 
   // Hero'dagi 6 ta vaqt; hozir davom etayotgan namoz vaqti ajratib ko'rsatiladi
@@ -257,7 +254,7 @@ window.App = (function () {
       const s = prayerState(lastTimes, Math.floor(nowSec / 60));
       let left = s.at * 60 - nowSec;
       if (left < 0) left += 24 * 3600;                          // ertangi bomdod
-      renderHero(lastTimes, s, left);
+      renderHero(s, left);
       renderAllTimes(lastTimes, s);
       const el = $("#hero-count-box") || $("#countdown").parentElement;
       el.classList.toggle("live", !!s.now);                     // namoz vaqti davom etyapti
