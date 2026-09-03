@@ -210,6 +210,12 @@ def upsert_days(uid: int, rows: list[tuple[str, int]]) -> None:
     c.commit()
 
 
+def user_count() -> int:
+    """Ro'yxatdagi foydalanuvchilar soni. /api/ping shu bilan bazaning tirikligini ko'rsatadi."""
+    c = conn()
+    return int((c.execute("SELECT COUNT(*) FROM users").fetchone() or [0])[0] or 0)
+
+
 def user_total(uid: int) -> int:
     row = conn().execute("SELECT total FROM users WHERE id=?", (uid,)).fetchone()
     return int(row["total"]) if row else 0

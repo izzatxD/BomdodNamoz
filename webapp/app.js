@@ -77,6 +77,17 @@ window.App = (function () {
     });
     $("#city-btn").addEventListener("click", () => { haptic(); try { sel.showPicker ? sel.showPicker() : sel.focus(); } catch (e) { sel.focus(); } });
 
+    // Bulut sekin tarmoqda kech javob berishi mumkin. Kelganda holatni qayta o'qib,
+    // ekranni yangilaymiz — foydalanuvchi ma'lumoti yo'qolgandek ko'rinib qolmasin.
+    Store.onReady(() => {
+      state.gender = Store.get("gender", state.gender);
+      state.city = Store.get("city", state.city);
+      state.geo = Store.get("geo", state.geo);
+      if (!state.gender) return;
+      if ($("#app").classList.contains("hidden")) enterApp();
+      else { renderToday(); if (tabRenderers[state.tab]) tabRenderers[state.tab](); }
+    });
+
     if (window.Api) Api.scheduleSync(600);
     if (state.city === "gps" && state.geo && Date.now() - state.geo.ts > 3600e3) locateAndLoad(true); // joyni jimgina yangilash
     if (state.gender) enterApp();

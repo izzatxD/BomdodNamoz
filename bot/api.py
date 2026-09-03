@@ -244,7 +244,18 @@ async def middleware(request: web.Request, handler):
 
 # ---------- handlerlar ----------
 async def ping(request: web.Request) -> web.Response:
-    return web.json_response({"ok": True, "time": int(time.time())})
+    """Sog'liq tekshiruvi. storage="vaqtinchalik" bo'lsa — baza har deploy'da o'chadi,
+    ya'ni Railway'da Volume (/data) ulanmagan. Faqat yig'indi, shaxsiy ma'lumot yo'q."""
+    try:
+        users = db.user_count()
+    except Exception:  # noqa: BLE001
+        users = -1
+    return web.json_response({
+        "ok": True,
+        "time": int(time.time()),
+        "storage": "doimiy" if db.DATA_DIR_PERSISTENT else "vaqtinchalik",
+        "users": users,
+    })
 
 
 async def sync(request: web.Request) -> web.Response:

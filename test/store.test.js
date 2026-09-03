@@ -13,10 +13,12 @@ const path = require("path");
 const STORE = path.join(__dirname, "..", "webapp", "store.js");
 
 // CloudStorage'ni taqlid qiladi — 4096 dan uzun qiymatni KESADI (haqiqiy xatti-harakat)
-function makeEnv() {
+function makeEnv(opts) {
   const cloudData = {};
   const store = {};
   let truncations = 0;
+  // "ok" — normal, "err" — xato qaytaradi, "hang" — umuman javob bermaydi (sekin tarmoq)
+  let mode = (opts && opts.mode) || "ok";
   global.window = {
     Telegram: {
       WebApp: {
@@ -27,8 +29,16 @@ function makeEnv() {
             cloudData[k] = v; cb && cb(null, true);
           },
           removeItem(k, cb) { delete cloudData[k]; cb && cb(null, true); },
-          getKeys(cb) { cb(null, Object.keys(cloudData)); },
-          getItems(keys, cb) { const o = {}; keys.forEach((k) => (o[k] = cloudData[k])); cb(null, o); },
+          getKeys(cb) {
+            if (mode === "hang") return;
+            if (mode === "err") return cb("network");
+            cb(null, Object.keys(cloudData));
+          },
+          getItems(keys, cb) {
+            if (mode === "hang") return;
+            if (mode === "err") return cb("network");
+            const o = {}; keys.forEach((k) => (o[k] = cloudData[k])); cb(null, o);
+          },
         },
       },
     },
@@ -37,11 +47,24 @@ function makeEnv() {
     getItem: (k) => (k in store ? store[k] : null),
     setItem: (k, v) => { store[k] = String(v); },
     removeItem: (k) => { delete store[k]; },
+    get length() { return Object.keys(store).length; },
+    key: (i) => Object.keys(store)[i] || null,
   };
   delete require.cache[require.resolve(STORE)];
   require(STORE);
-  return { Store: window.Store, cloudData, store, truncations: () => truncations };
+  return {
+    Store: window.Store, cloudData, store,
+    truncations: () => truncations,
+    setMode: (m) => { mode = m; },
+  };
 }
+
+// store.js ning qayta urinish oralig'i 3 soniya — sinovda uni qisqartiramiz
+const realTimeout = global.setTimeout;
+function fastTimers(on) {
+  global.setTimeout = on ? ((fn, ms) => realTimeout(fn, Math.min(ms || 0, 3))) : realTimeout;
+}
+const sleep = (ms) => new Promise((r) => realTimeout(r, ms));
 
 function bigDays(n) {
   const d = {}, base = new Date(2026, 6, 20);
@@ -67,6 +90,7 @@ const ok = (name, cond, extra) => {
 (async () => {
   console.log("1) Katta ma'lumot bo'laklarga bo'lib saqlanadi");
   const A = makeEnv();
+  await A.Store.load();            // himoya: load() dan oldin bulutga yozilmaydi
   const days = bigDays(45);
   A.Store.set("days", days);
   A.Store.set("qazo", QAZO);
@@ -111,6 +135,52 @@ const ok = (name, cond, extra) => {
   await G.Store.load();
   ok("to'liq nusxa saqlanib qoldi", Object.keys(G.Store.get("days", {})).length === 45);
 
+  // ---- Eng xavfli holat ----
+  // Sekin tarmoqda ilova ochildi, bulut javob bermadi. Agar ilova bu paytda
+  // "foydalanuvchi yangi" deb o'ylab yoza boshlasa — bulutdagi qazo va Nur
+  // tarixi butunlay o'chadi. Ayni shu yo'l berkitilganini tekshiramiz.
+  fastTimers(true);
+
+  console.log("\n6) Bulut javob bermasa — bulutdagi ma'lumot o'chirilmaydi");
+  const H = makeEnv({ mode: "hang" });
+  Object.assign(H.cloudData, A.cloudData);        // bulutda 45 kunlik tarix va qazo bor
+  const snapshot = JSON.stringify(H.cloudData);
+  await H.Store.load();                            // javob kelmaydi
+  ok("bulut o'qilmagani bilinadi", H.Store.synced === false);
+  H.Store.set("gender", "erkak");                  // foydalanuvchi qaytadan kiritdi
+  H.Store.set("days", bigDays(1));                 // va bitta zikr qildi
+  H.Store.set("qazo", { left: {}, total: {}, plan: 5 });
+  ok("bulutdagi nusxa tegilmadi", JSON.stringify(H.cloudData) === snapshot);
+  ok("telefonda ishlayveradi", H.Store.get("gender", null) === "erkak");
+
+  console.log("\n7) Aloqa tiklanganda tarix qaytadi");
+  H.setMode("ok");
+  await sleep(60);                                 // fon urinishi ishga tushadi
+  ok("bulut o'qildi", H.Store.synced === true);
+  ok("qazo hisobi qaytdi", H.Store.get("qazo", {}).left.bomdod === 1250);
+  ok("45 kunlik tarix qaytdi", Object.keys(H.Store.get("days", {})).length === 45);
+  ok("jami Nur qaytdi", H.Store.get("nur", {}).total === 184320);
+
+  console.log("\n8) Telefonda ma'lumot bo'lsa — seansdagi o'zgarish ustun turadi");
+  const I = makeEnv({ mode: "err" });
+  Object.assign(I.cloudData, A.cloudData);
+  I.store["bomdod_city"] = "Toshkent";                   // telefonda avval ham bor edi (satr xom saqlanadi)
+  await I.Store.load();
+  I.Store.set("city", "Farg'ona");                       // foydalanuvchi o'zgartirdi
+  I.setMode("ok");
+  await sleep(60);
+  ok("yangi tanlov saqlandi", I.Store.get("city", "") === "Farg'ona");
+  ok("bulutga ham yozildi", I.cloudData["city"] === "Farg'ona");
+  ok("tegilmagan tarix bulutdan olindi", Object.keys(I.Store.get("days", {})).length === 45);
+
+  console.log("\n9) Bulut haqiqatan bo'sh bo'lsa — yozishga ruxsat beriladi");
+  const J = makeEnv();                                   // bo'sh bulut, xato yo'q
+  await J.Store.load();
+  ok("darhol tayyor", J.Store.synced === true);
+  J.Store.set("gender", "ayol");
+  ok("yangi foydalanuvchi yoza oladi", J.cloudData["gender"] === "ayol");
+
+  fastTimers(false);
   console.log(failed ? `\n${failed} ta sinov muvaffaqiyatsiz` : "\nHamma sinov o'tdi");
   process.exit(failed ? 1 : 0);
 })();
