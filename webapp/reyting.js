@@ -143,7 +143,7 @@ window.Reyting = (function () {
   function renderHowTo() {
     return `<div class="card"><div class="card-label">Qanday ishlaydi</div>
       <div class="pledge-rules">
-        <div class="pledge-rule">${Icons.get("medal", 20)}<div><b>Liga</b><small>Sizning darajangizdagi odamlar bilan haftalik musobaqa.</small></div></div>
+        <div class="pledge-rule">${Icons.get("medal", 20)}<div><b>Liga</b><small>Haftalik musobaqa. Odam ko'paygach daraja bo'yicha bo'linadi — shunda o'zingizga tenglar bilan yarashasiz.</small></div></div>
         <div class="pledge-rule">${Icons.get("users", 20)}<div><b>Jamoa</b><small>Oila yoki do'stlar guruhiga botni qo'shing va <b>/jamoa</b> yozing — guruh jamoaga aylanadi.</small></div></div>
         <div class="pledge-rule">${Icons.get("user", 20)}<div><b>Do'stlar</b><small>Taklif havolasini yuboring — qabul qilgan do'stingiz bilan bir-biringizni ko'rasiz.</small></div></div>
       </div></div>`;

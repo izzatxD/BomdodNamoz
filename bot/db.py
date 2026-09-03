@@ -38,6 +38,11 @@ DB_FILE = DATA_DIR / "reyting.db"
 # Darajalar — webapp/nur.js dagi LEVELS bilan BIR XIL bo'lishi shart
 LEVELS = [("Sham", 0), ("Chiroq", 500), ("Mash'al", 1500), ("Yulduz", 4000), ("Oy", 10000), ("Quyosh", 25000)]
 
+# Shu haftada faol odam soni shundan kam bo'lsa — liga darajalarga bo'linmaydi,
+# hamma bitta "Umumiy reyting" da ko'rinadi. Aks holda kichik jamoada har daraja
+# bo'sh jadval bo'lib qoladi va musobaqa his qilinmaydi.
+LEAGUE_MIN_USERS = 30
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
   id      INTEGER PRIMARY KEY,          -- Telegram user id
@@ -530,8 +535,15 @@ def board(
         pool, title, include_zero = [uid] + friends_of(uid), "Do'stlar", True
     else:
         scope = "liga"
-        pool = [u for u, t in totals.items() if level_index(t) == my_level]
-        title, include_zero = f"{level_name(my_level)} ligasi", False
+        # Liga daraja bo'yicha bo'linadi — lekin faqat odam yetarli bo'lganda.
+        # Boshida (yoki faollik pasayganda) bo'linish jadvalni bo'm-bo'sh qoldiradi,
+        # shuning uchun hamma bitta umumiy reytingda ko'rsatiladi.
+        active = active_users(mon, sun)
+        if len(active) < LEAGUE_MIN_USERS:
+            pool, title = list(totals.keys()), "Umumiy reyting"
+        else:
+            pool, title = [u for u, t in totals.items() if level_index(t) == my_level], f"{level_name(my_level)} ligasi"
+        include_zero = False
 
     scores = week_scores(mon, sun, pool)
     ranked = [(u, scores.get(u, 0)) for u in pool if include_zero or scores.get(u, 0) > 0]
