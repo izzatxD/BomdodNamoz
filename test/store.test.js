@@ -180,6 +180,25 @@ const ok = (name, cond, extra) => {
   J.Store.set("gender", "ayol");
   ok("yangi foydalanuvchi yoza oladi", J.cloudData["gender"] === "ayol");
 
+  console.log("\n10) Kun tarixi cheksiz o'smaydi");
+  // days{} har kuni ~140 bayt o'sadi. Cheklanmasa ~15 oydan keyin bulutning
+  // 64 KB chegarasidan oshadi va cloudSet JIMGINA yozmay qo'yadi — qurilma
+  // almashtirilganda hammasi yo'qoladi. Ikkala yozuvchi ham 45 kun bilan
+  // cheklashi shart: zikr.js (zikr qilganda) va nur.js (qazo/dars belgilanganda).
+  const src = require("fs").readFileSync(path.join(__dirname, "..", "webapp", "nur.js"), "utf8");
+  const zsrc = require("fs").readFileSync(path.join(__dirname, "..", "webapp", "zikr.js"), "utf8");
+  ok("nur.js cheklaydi", /while \(keys\.length > 45\)/.test(src));
+  ok("zikr.js cheklaydi", /while \(keys\.length > 45\)/.test(zsrc));
+  ok("nur.js to'g'ridan-to'g'ri yozmaydi", (src.match(/Store\.set\("days"/g) || []).length === 1);
+  ok("zikr.js to'g'ridan-to'g'ri yozmaydi", (zsrc.match(/Store\.set\("days"/g) || []).length === 1);
+
+  // 45 kunlik eng og'ir holat bulutga to'liq sig'ishi kerak (16 bo'lak = 64 KB)
+  const K = makeEnv();
+  await K.Store.load();
+  K.Store.set("days", bigDays(45));
+  const parts = Object.keys(K.cloudData).filter((k) => /^days__/.test(k)).length;
+  ok("bulutga to'liq sig'di", parts > 0 && parts <= 16, parts + " bo'lak");
+
   fastTimers(false);
   console.log(failed ? `\n${failed} ta sinov muvaffaqiyatsiz` : "\nHamma sinov o'tdi");
   process.exit(failed ? 1 : 0);

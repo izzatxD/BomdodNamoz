@@ -44,6 +44,15 @@ window.Nur = (function () {
   ];
 
   function days() { return Store.get("days", {}); }
+  // days{} faqat 45 kun saqlaydi (zikr.js dagi qoida bilan bir xil). Cheklamasa u
+  // cheksiz o'sadi va ~15 oydan keyin bulutning 64 KB chegarasidan oshib ketadi —
+  // shundan keyin bulutga JIMGINA yozilmay qoladi va qurilma almashtirilganda
+  // hammasi yo'qoladi. O'tgan kunlarning Nur'i "nur" kalitiga yig'ib boriladi.
+  function saveDays(d) {
+    const keys = Object.keys(d).sort();
+    while (keys.length > 45) delete d[keys.shift()];
+    Store.set("days", d);
+  }
   function taps(rec) { return Object.values((rec && rec.s) || {}).reduce((a, b) => a + (Number(b) || 0), 0); }
 
   // Shu kunga qadar ketma-ket bajarilgan kunlar (shu kun ham kiradi)
@@ -127,7 +136,7 @@ window.Nur = (function () {
     const d = days(), td = Store.today();
     d[td] = d[td] || { s: {} };
     d[td][field] = Math.max(0, (Number(d[td][field]) || 0) + (delta == null ? 1 : delta));
-    Store.set("days", d);
+    saveDays(d);
   }
 
   // ---------- nishonlar ----------
