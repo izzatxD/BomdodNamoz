@@ -199,6 +199,38 @@ const ok = (name, cond, extra) => {
   const parts = Object.keys(K.cloudData).filter((k) => /^days__/.test(k)).length;
   ok("bulutga to'liq sig'di", parts > 0 && parts <= 16, parts + " bo'lak");
 
+  console.log("\n11) Butun yo'l: /start → qazo → tasbih → yangi versiya chiqdi");
+  // Botga qo'shilgan odam ilovani ochadi, qazo kiritadi, tasbih aylantiradi,
+  // dars ko'radi. Keyin yangi versiya chiqadi va ilova noldan yuklanadi.
+  // Hammasi joyida turishi shart — foydalanuvchi eng ko'p shundan qo'rqadi.
+  const U = makeEnv();
+  await U.Store.load();                     // birinchi kirish — bulut bo'sh
+  const td = U.Store.today();
+  U.Store.set("gender", "erkak");
+  U.Store.set("qazo", QAZO);                // qazo hisobini kiritdi
+  const jrn = {};
+  jrn[td] = { t: 14, n: 15, s: { subhanalloh: 100, istighfar: 100 }, ok: true, q: 5, a: 1 };
+  U.Store.set("days", jrn);                 // zikr, tasbih, qazo, dars belgilandi
+  U.Store.set("nur", { total: 12480, upto: "2026-09-02" });
+  U.Store.set("badges", ["tong", "tun"]);
+  U.Store.set("habit", { start: "2026-08-01" });
+  U.Store.set("arab", { l1: 100, l2: 60 });
+  U.Store.set("watched", { vjsuonSdsFM: 100 });
+
+  // ---- yangi versiya chiqdi: ilova qaytadan yuklandi, bulut o'sha-o'sha ----
+  const V = makeEnv();
+  Object.assign(V.cloudData, U.cloudData);
+  await V.Store.load();
+  ok("qazo hisobi joyida", V.Store.get("qazo", {}).left.bomdod === 1250);
+  ok("tasbih joyida", V.Store.get("days", {})[td].s.subhanalloh === 100);
+  ok("kunlik zikr joyida", V.Store.get("days", {})[td].t === 14);
+  ok("jami Nur joyida", V.Store.get("nur", {}).total === 12480);
+  ok("nishonlar joyida", V.Store.get("badges", []).length === 2);
+  ok("30 kunlik dastur joyida", V.Store.get("habit", {}).start === "2026-08-01");
+  ok("arab tili progressi joyida", V.Store.get("arab", {}).l2 === 60);
+  ok("ko'rilgan video joyida", V.Store.get("watched", {}).vjsuonSdsFM === 100);
+  ok("jins joyida", V.Store.get("gender", null) === "erkak");
+
   fastTimers(false);
   console.log(failed ? `\n${failed} ta sinov muvaffaqiyatsiz` : "\nHamma sinov o'tdi");
   process.exit(failed ? 1 : 0);
