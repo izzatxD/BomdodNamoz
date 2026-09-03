@@ -272,6 +272,20 @@ def recipients(segment: str, today: date) -> list[int]:
     return [int(r["id"]) for r in rows]
 
 
+def import_users(ids: list[int]) -> int:
+    """Eski bot platformasidan eksport qilingan ID ro'yxati. Bor bo'lganlarga tegmaydi.
+    Qaytaradi: yangi qo'shilganlar soni. Ular «Hammaga» e'loniga kiradi."""
+    c = conn()
+    now = int(time.time())
+    before = c.total_changes
+    c.executemany(
+        "INSERT OR IGNORE INTO users (id, name, created, updated) VALUES (?, '', ?, ?)",
+        [(i, now, now) for i in ids if i > 0],
+    )
+    c.commit()
+    return c.total_changes - before
+
+
 def segment_counts(today: date) -> dict[str, int]:
     return {seg: len(recipients(seg, today)) for seg in ("hamma", "faol", "uxlagan")}
 

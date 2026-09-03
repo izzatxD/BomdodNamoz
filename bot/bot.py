@@ -14,9 +14,11 @@ Ishga tushirish:
 
 import asyncio
 import html
+import io
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime
 from pathlib import Path
@@ -157,6 +159,9 @@ _drafts: dict[int, dict] = {}
 # Bir vaqtda faqat bitta e'lon yuboriladi; "stop" — admin «To'xtatish»ni bosdi
 _broadcast: dict = {"running": False, "stop": False}
 SEGMENTS = {"hamma": "👥 Hammaga", "faol": "🔥 Shu hafta faollar", "uxlagan": "😴 14 kun kirmaganlar"}
+# Eski platformadan ID ro'yxatini import qilish: {admin_id: {"wait": bool, "ids": [...]}}
+_imports: dict[int, dict] = {}
+IMPORT_ID_RE = re.compile(r"\b\d{5,11}\b")  # har qatordagi birinchi raqam — Telegram ID
 COUNT_FILE = db.DATA_DIR / ".users_count"        # health_check: foydalanuvchilar soni kamaysa — ogohlantirish
 LAST_BACKUP_FILE = db.DATA_DIR / ".last_backup"  # admin sahifasida "oxirgi zaxira" uchun
 
@@ -493,6 +498,7 @@ async def send_admin_panel(bot: Bot, chat_id: int) -> None:
         "/xabar — hammaga yoki tanlangan guruhga e'lon\n"
         "/stat — statistika (faqat yig'indilar)\n"
         "/backup — bazaning nusxasini olish\n"
+        "/import — eski platformadan foydalanuvchilar ro'yxatini kiritish\n"
         "/admin — shu ro'yxat\n\n"
         "📎 <b>PDF yoki kitob</b> — faylni shu chatga yuboring, qaysi bo'limga qo'shishni so'rayman.\n"
         "🎬 <b>Video</b> — ilovadagi Video bo'limida «Video qo'shish».\n"
@@ -509,6 +515,93 @@ async def cmd_admin(message: Message) -> None:
         await message.answer("Bu buyruq faqat adminlar uchun.")
         return
     await send_admin_panel(message.bot, message.chat.id)
+
+
+@router.message(Command("import"))
+async def cmd_import(message: Message) -> None:
+    """Eski bot platformasidan eksport qilingan foydalanuvchilar ro'yxatini bazaga kiritish."""
+    user = message.from_user
+    if not user or user.id not in ADMIN_IDS:
+        await message.answer("Bu buyruq faqat adminlar uchun.")
+        return
+    _imports[user.id] = {"wait": True}
+    await message.answer(
+        "📥 <b>Foydalanuvchilarni import qilish</b>\n\n"
+        "Eski bot platformasidan eksport qilingan ro'yxatni yuboring — <b>.txt yoki .csv fayl</b>, "
+        "yoki ID larni matn sifatida (har qatorda bitta).\n"
+        "Har qatordagi birinchi raqam Telegram ID sifatida olinadi.\n\n"
+        "Import qilinganlar «Hammaga» e'loniga kiradi. Botni bloklaganlar birinchi e'londa aniqlanib, "
+        "keyingilaridan chiqarib tashlanadi.\n\n"
+        "Bekor qilish: /bekor",
+        parse_mode="HTML",
+    )
+
+
+def _awaiting_import(message: Message) -> bool:
+    user = message.from_user
+    return bool(
+        user and user.id in ADMIN_IDS
+        and _imports.get(user.id, {}).get("wait")
+        and not (message.text or "").startswith("/")
+    )
+
+
+@router.message(F.chat.type == "private", _awaiting_import)
+async def on_import_list(message: Message) -> None:
+    uid = message.from_user.id
+    raw = message.text or ""
+    if message.document:
+        doc = message.document
+        if (doc.file_size or 0) > 20 * 1024 * 1024:
+            await message.answer("Fayl juda katta — 20 MB dan oshmasin.")
+            return
+        data = await message.bot.download(doc)
+        raw = data.read().decode("utf-8", errors="ignore")
+    ids: list[int] = []
+    seen: set[int] = set()
+    for line in raw.splitlines():
+        m = IMPORT_ID_RE.search(line)
+        if not m:
+            continue
+        v = int(m.group(0))
+        if v not in seen:
+            seen.add(v)
+            ids.append(v)
+    if not ids:
+        await message.answer("Ro'yxatda Telegram ID topilmadi. Har qatorda ID birinchi turishi kerak, masalan: 123456789")
+        return
+    _imports[uid] = {"wait": False, "ids": ids}
+    sample = ", ".join(str(i) for i in ids[:3])
+    await message.answer(
+        f"Topildi: <b>{len(ids)}</b> ta ID (masalan: {sample}).\n\nBazaga qo'shilsinmi?",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Qo'shish", callback_data="imp:go"),
+            InlineKeyboardButton(text="❌ Bekor", callback_data="imp:cancel"),
+        ]]),
+        parse_mode="HTML",
+    )
+
+
+@router.callback_query(F.data.startswith("imp:"))
+async def cb_import(query: CallbackQuery) -> None:
+    uid = query.from_user.id
+    if uid not in ADMIN_IDS:
+        await query.answer("Ruxsat yo'q")
+        return
+    st = _imports.pop(uid, None)
+    if query.data == "imp:cancel" or not st or not st.get("ids"):
+        await query.answer("Bekor qilindi")
+        if query.message:
+            await query.message.edit_text("Import bekor qilindi.")
+        return
+    added = db.import_users(st["ids"])
+    await query.answer("Qo'shildi")
+    if query.message:
+        await query.message.edit_text(
+            f"✅ Import tugadi.\n\nYangi qo'shildi: <b>{added}</b>\nAllaqachon bor edi: {len(st['ids']) - added}\n"
+            f"Jami bazada: <b>{db.user_count()}</b>\n\nEndi /xabar → «Hammaga» — ularga ham boradi.",
+            parse_mode="HTML",
+        )
 
 
 async def start_broadcast(bot: Bot, chat_id: int, uid: int, text: str = "") -> None:
@@ -556,6 +649,8 @@ async def cmd_bekor(message: Message) -> None:
     user = message.from_user
     if user and _drafts.pop(user.id, None) is not None:
         await message.answer("E'lon bekor qilindi.")
+    elif user and _imports.pop(user.id, None) is not None:
+        await message.answer("Import bekor qilindi.")
     else:
         await message.answer("Bekor qiladigan narsa yo'q.")
 
@@ -1131,6 +1226,7 @@ async def main() -> None:
     admin_commands = commands + [
         BotCommand(command="admin", description="Admin paneli"),
         BotCommand(command="xabar", description="E'lon yuborish"),
+        BotCommand(command="import", description="Foydalanuvchilar ro'yxatini kiritish"),
         BotCommand(command="stat", description="Statistika"),
         BotCommand(command="backup", description="Baza nusxasi"),
     ]
