@@ -1,0 +1,14 @@
+# sirlar va mahalliy ma'lumotlar
+.env
+users.json
+
+# baza (Railway'da volume ichida turadi)
+*.db
+*.db-wal
+*.db-shm
+reyting-backup.db
+
+# python
+__pycache__/
+*.pyc
+.venv/

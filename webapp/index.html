@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Bomdod namozi</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+</head>
+<body>
+
+  <!-- ===== Kirish: erkak / ayol tanlash ===== -->
+  <section id="screen-welcome" class="screen active">
+    <div class="welcome">
+      <div class="welcome-art"><i data-icon="mosque" data-size="56"></i></div>
+      <h1>Bomdod namozi</h1>
+      <p class="muted">Namoz, zikr va arab tilini<br>qadam-baqadam o'rganing</p>
+      <p class="label">Kim uchun?</p>
+      <div class="gender-grid">
+        <button class="gender-card" data-gender="erkak"><span class="gender-emoji">👨</span><span>Erkaklar</span></button>
+        <button class="gender-card" data-gender="ayol"><span class="gender-emoji">🧕</span><span>Ayollar</span></button>
+      </div>
+      <p class="muted small">Keyin istalgan vaqtda almashtirishingiz mumkin</p>
+    </div>
+  </section>
+
+  <!-- ===== Asosiy ilova ===== -->
+  <div id="app" class="hidden">
+
+    <header class="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">Bomdod namozi</div>
+        <div class="topbar-sub" id="topbar-sub"></div>
+      </div>
+      <button class="chip" id="btn-gender">👨 Erkak</button>
+    </header>
+
+    <!-- ================= BOSH ================= -->
+    <section id="tab-home" class="screen tab active">
+      <div class="hero">
+        <div class="hero-pattern"></div>
+        <div class="hero-top">
+          <div>
+            <div class="hero-greet" id="greet">Assalomu alaykum</div>
+            <div class="hero-date" id="hero-date"><span class="skeleton w120"></span></div>
+          </div>
+          <button class="hero-city" id="city-btn"><i data-icon="pin" data-size="14"></i><span id="city-name">Toshkent</span></button>
+          <select id="city-select" class="city-select-hidden"></select>
+        </div>
+        <div class="hero-times">
+          <div class="hero-time">
+            <div class="hero-time-label"><i data-icon="sunrise" data-size="14"></i>Bomdod</div>
+            <div class="hero-time-val" id="fajr-time"><span class="skeleton w80"></span></div>
+          </div>
+          <div class="hero-divider"></div>
+          <div class="hero-time">
+            <div class="hero-time-label"><i data-icon="sun" data-size="14"></i>Quyosh chiqishi</div>
+            <div class="hero-time-val sm" id="sunrise-time"><span class="skeleton w60"></span></div>
+          </div>
+        </div>
+        <div class="hero-countdown" id="countdown"><span class="skeleton w160"></span></div>
+        <div class="hero-all" id="times-all"></div>
+      </div>
+
+      <div class="card today-card" id="today-card"></div>
+      <div class="card today-card nur-card" id="nur-card" role="button"></div>
+
+      <div class="section-head"><h2 class="section-title">Bo'limlar</h2></div>
+      <div class="grid2">
+        <button class="tile" data-go="namoz"><span class="tile-icon t-green"><i data-icon="mosque"></i></span><b>Namoz</b><small>Qadam-baqadam</small></button>
+        <button class="tile" data-go="zikr"><span class="tile-icon t-gold"><i data-icon="beads"></i></span><b>Zikrlar</b><small>Tong, tun, tasbih</small></button>
+        <button class="tile" data-go="arab"><span class="tile-icon t-blue"><i data-icon="letters"></i></span><b>Arab tili</b><small>Alifbodan o'qishgacha</small></button>
+        <button class="tile" data-go="qazo"><span class="tile-icon t-rose"><i data-icon="calendar"></i></span><b>Qazo namozlar</b><small>Hisob-kitob</small></button>
+        <button class="tile" data-go="suralar"><span class="tile-icon t-teal"><i data-icon="book"></i></span><b>Suralar</b><small>Matn va ma'no</small></button>
+        <button class="tile" data-go="video"><span class="tile-icon t-purple"><i data-icon="video"></i></span><b>Video darslar</b><small id="video-count"></small></button>
+      </div>
+
+      <div class="quote">
+        <div class="quote-mark">“</div>
+        <p>Bomdod namozining ikki rakat sunnati dunyo va undagi hamma narsadan yaxshiroqdir.</p>
+        <span class="quote-src">Muslim rivoyati</span>
+      </div>
+    </section>
+
+    <!-- ================= NAMOZ ================= -->
+    <section id="tab-namoz" class="screen tab">
+      <div class="card intro-card" id="namoz-intro"></div>
+      <div class="segmented" id="rakat-seg">
+        <button class="seg active" data-rakat="sunnat">2 rakat sunnat</button>
+        <button class="seg" data-rakat="farz">2 rakat farz</button>
+      </div>
+      <div class="card niyat-card"><div class="card-label">Niyat</div><p id="niyat-text"></p></div>
+      <div class="progress"><div class="progress-bar" id="step-progress"></div></div>
+      <div id="step-view"></div>
+      <div class="step-nav">
+        <button class="btn ghost" id="step-prev"><i data-icon="back" data-size="18"></i> Oldingi</button>
+        <span class="step-counter" id="step-counter"></span>
+        <button class="btn primary" id="step-next">Keyingi <i data-icon="chevron" data-size="18"></i></button>
+      </div>
+      <div class="card" id="namoz-after"></div>
+      <button class="menu-item" data-go="qazo"><span class="menu-icon t-rose"><i data-icon="calendar"></i></span><span class="menu-text"><b>Qazo namozlar</b><small>O'tkazib yuborilgan namozlar hisobi</small></span><i data-icon="chevron" class="menu-arrow"></i></button>
+    </section>
+
+    <!-- ================= QAZO ================= -->
+    <section id="tab-qazo" class="screen tab">
+      <div class="card stat-card">
+        <div class="card-label">Umumiy</div>
+        <div class="qazo-total"><span id="qazo-total-num">0</span> <small>ta qazo qoldi</small></div>
+        <div class="progress"><div class="progress-bar" id="qazo-progress"></div></div>
+        <p class="muted small" id="qazo-plan"></p>
+      </div>
+      <div id="qazo-list"></div>
+      <div class="card">
+        <div class="card-label">Hisoblash yordamchisi</div>
+        <p class="small muted">Qancha vaqt namoz o'qimagan bo'lsangiz, taxminiy hisoblab beradi (balog'at yoshidan boshlab).</p>
+        <div class="row3">
+          <label>Yil<input type="number" id="calc-y" min="0" value="0"></label>
+          <label>Oy<input type="number" id="calc-m" min="0" max="11" value="0"></label>
+          <label>Kun<input type="number" id="calc-d" min="0" max="30" value="0"></label>
+        </div>
+        <button class="btn primary wide" id="calc-btn">Hisoblab qo'shish</button>
+      </div>
+      <div class="card">
+        <div class="card-label">Kunlik reja</div>
+        <p class="small">Kuniga har namozdan nechta qazo o'qiysiz?</p>
+        <div class="stepper"><button id="plan-minus">−</button><span id="plan-num">1</span><button id="plan-plus">+</button></div>
+      </div>
+      <div class="card">
+        <div class="card-label">Qazo namozi qanday o'qiladi?</div>
+        <p class="small">Qazo namoz oddiy namoz kabi, faqat farz (va xufton uchun vitr) rakatlari o'qiladi, sunnatlar qazo qilinmaydi. Niyatda «qazo» so'zi qo'shiladi:</p>
+        <p class="small"><i>«Niyat qildim Alloh rizoligi uchun zimmamdagi eng birinchi bomdod namozining ikki rakat farzining qazosini o'qishga. Allohu akbar.»</i></p>
+        <p class="small muted">Qazo namozlarni har qanday vaqtda (quyosh chiqish, tik va botish paytidan tashqari) o'qish mumkin. Har farz namozidan keyin bittadan qazo o'qish — eng oson yo'l.</p>
+      </div>
+      <button class="btn ghost wide danger" id="qazo-reset">Hisobni tozalash</button>
+    </section>
+
+    <!-- ================= ZIKR ================= -->
+    <section id="tab-zikr" class="screen tab">
+      <div class="segmented" id="zikr-seg">
+        <button class="seg active" data-kind="odat"><i data-icon="sprout" data-size="16"></i>Odat</button>
+        <button class="seg" data-kind="tong"><i data-icon="sunrise" data-size="16"></i>Tong</button>
+        <button class="seg" data-kind="tun"><i data-icon="moon" data-size="16"></i>Tun</button>
+        <button class="seg" data-kind="tasbih"><i data-icon="beads" data-size="16"></i>Tasbih</button>
+      </div>
+      <div id="zikr-body"></div>
+    </section>
+
+    <!-- ================= ARAB TILI ================= -->
+    <section id="tab-arab" class="screen tab"><div id="arab-body"></div></section>
+
+    <!-- ================= SURALAR ================= -->
+    <section id="tab-suralar" class="screen tab">
+      <div class="segmented" id="sura-seg">
+        <button class="seg active" data-kind="suralar">Suralar</button>
+        <button class="seg" data-kind="zikrlar">Namoz duolari</button>
+      </div>
+      <div class="list" id="sura-list"></div>
+    </section>
+
+    <!-- ================= VIDEO ================= -->
+    <section id="tab-video" class="screen tab"><div id="video-body"></div></section>
+
+    <!-- ================= REYTING (Nur) ================= -->
+    <section id="tab-reyting" class="screen tab"><div id="reyting-body"></div></section>
+
+    <!-- ================= Batafsil (overlay) ================= -->
+    <section id="screen-detail" class="screen detail">
+      <div class="detail-head">
+        <button class="back" id="detail-back"><i data-icon="back" data-size="20"></i> Orqaga</button>
+        <div class="font-ctrl"><button id="font-minus">A−</button><button id="font-plus">A+</button></div>
+      </div>
+      <div id="detail-body"></div>
+    </section>
+
+    <!-- ================= Pastki navigatsiya ================= -->
+    <nav class="bottombar">
+      <button class="nav active" data-tab="home"><i data-icon="home"></i><span>Bosh</span></button>
+      <button class="nav" data-tab="namoz"><i data-icon="mosque"></i><span>Namoz</span></button>
+      <button class="nav" data-tab="zikr"><i data-icon="beads"></i><span>Zikr</span></button>
+      <button class="nav" data-tab="reyting"><i data-icon="trophy"></i><span>Reyting</span></button>
+      <button class="nav" data-tab="arab"><i data-icon="letters"></i><span>Arab tili</span></button>
+      <button class="nav" data-tab="suralar"><i data-icon="book"></i><span>Suralar</span></button>
+    </nav>
+  </div>
+
+  <script src="icons.js"></script>
+  <script src="data.js"></script>
+  <script src="data_zikr.js"></script>
+  <script src="data_arabic.js"></script>
+  <script src="store.js"></script>
+  <script src="vaqt.js"></script>
+  <script src="app.js"></script>
+  <script src="zikr.js"></script>
+  <script src="arabic.js"></script>
+  <script src="qazo.js"></script>
+  <script src="nur.js"></script>
+  <script src="api.js"></script>
+  <script src="reyting.js"></script>
+  <script src="video.js"></script>
+</body>
+</html>

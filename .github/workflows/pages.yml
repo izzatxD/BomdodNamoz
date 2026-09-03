@@ -1,0 +1,41 @@
+# Mini App (webapp/) ni GitHub Pages'ga joylaydi.
+# GitHub → Settings → Pages → Source: "GitHub Actions" bo'lishi shart.
+# Har deploy'da script/css havolalariga ?v=<commit> qo'shiladi — Telegram eski JS ni keshda ushlab qolmaydi.
+name: Mini App → GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ["webapp/**", ".github/workflows/pages.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kesh versiyasi (?v=commit)
+        run: |
+          V="${GITHUB_SHA::8}"
+          sed -i -E "s/(src|href)=\"([a-z_]+\.(js|css))\"/\1=\"\2?v=$V\"/g" webapp/index.html
+          echo "versiyalangan havolalar: $(grep -c "?v=$V" webapp/index.html)"
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: webapp
+      - id: deployment
+        uses: actions/deploy-pages@v4

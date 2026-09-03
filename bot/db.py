@@ -1,0 +1,491 @@
+"""
+Reyting ma'lumotlar bazasi — SQLite (Python standart kutubxonasi, qo'shimcha o'rnatish kerak emas).
+Fayl: bot/reyting.db (git'ga qo'shilmaydi).
+
+MAXFIYLIK: foydalanuvchi bo'yicha faqat KUNLIK UMUMIY Nur saqlanadi.
+Zikr, tasbih, qazo va dars tafsilotlari serverga umuman kelmaydi — api.py kategoriya yig'indilarini
+chegaralab qo'shadi va faqat kunlik jamini shu yerga yozadi.
+"""
+from __future__ import annotations
+
+import os
+import sqlite3
+import time
+from datetime import date, timedelta
+from pathlib import Path
+
+# Ma'lumotlar papkasi. Railway'da doimiy disk (volume) — masalan /data — DATA_DIR env orqali beriladi;
+# bo'lmasa bot/ papkasi. Volume'siz har deploy'da baza yo'qoladi!
+DATA_DIR = Path(os.getenv("DATA_DIR") or Path(__file__).parent)
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+DB_FILE = DATA_DIR / "reyting.db"
+
+# Darajalar — webapp/nur.js dagi LEVELS bilan BIR XIL bo'lishi shart
+LEVELS = [("Sham", 0), ("Chiroq", 500), ("Mash'al", 1500), ("Yulduz", 4000), ("Oy", 10000), ("Quyosh", 25000)]
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS users (
+  id      INTEGER PRIMARY KEY,          -- Telegram user id
+  name    TEXT    NOT NULL DEFAULT '',
+  anon    INTEGER NOT NULL DEFAULT 0,   -- 1 bo'lsa reytingda "Anonim #NNN" ko'rinadi
+  base    INTEGER NOT NULL DEFAULT 0,   -- birinchi ulanishda ilovadan qabul qilingan avvalgi jami (chegaralangan)
+  total   INTEGER NOT NULL DEFAULT 0,   -- base + SUM(daily.nur) — keshlangan; har yozuvda faqat shu odamniki yangilanadi
+  created INTEGER NOT NULL DEFAULT 0,
+  updated INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS daily (
+  user_id INTEGER NOT NULL,
+  day     TEXT    NOT NULL,             -- YYYY-MM-DD
+  nur     INTEGER NOT NULL DEFAULT 0,   -- kunlik UMUMIY Nur (tafsilotsiz)
+  PRIMARY KEY (user_id, day)
+);
+-- Qoplovchi indeks: week_scores() faqat indeksdan o'qiydi, jadvalga tushmaydi (o'lchovda 1.8–3.3× tez)
+CREATE INDEX IF NOT EXISTS daily_day_user ON daily(day, user_id, nur);
+DROP INDEX IF EXISTS daily_day;
+CREATE TABLE IF NOT EXISTS teams (
+  chat_id INTEGER PRIMARY KEY,          -- Telegram guruh id
+  title   TEXT    NOT NULL DEFAULT '',
+  created INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS members (
+  chat_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL,
+  joined  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (chat_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS friends (
+  a INTEGER NOT NULL,
+  b INTEGER NOT NULL,
+  PRIMARY KEY (a, b)
+);
+CREATE TABLE IF NOT EXISTS videos (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  section  TEXT    NOT NULL DEFAULT 'boshqa',   -- webapp/data.js dagi videoSections id si
+  title    TEXT    NOT NULL DEFAULT '',
+  yt       TEXT    NOT NULL DEFAULT '',         -- YouTube video ID (11 belgi)
+  duration TEXT    NOT NULL DEFAULT '',
+  gender   TEXT    NOT NULL DEFAULT 'hamma',    -- hamma | erkak | ayol
+  note     TEXT    NOT NULL DEFAULT '',
+  ord      INTEGER NOT NULL DEFAULT 0,          -- bo'lim ichidagi tartib
+  created  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS videos_section ON videos(section, ord);
+CREATE TABLE IF NOT EXISTS files (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  section  TEXT    NOT NULL DEFAULT 'boshqa',
+  title    TEXT    NOT NULL DEFAULT '',
+  file_id  TEXT    NOT NULL DEFAULT '',         -- Telegram file_id — fayl Telegram serverida turadi
+  kind     TEXT    NOT NULL DEFAULT 'pdf',
+  size     INTEGER NOT NULL DEFAULT 0,
+  ord      INTEGER NOT NULL DEFAULT 0,
+  created  INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS files_section ON files(section, ord);
+"""
+
+# Keyingi versiyalarda qo'shilgan ustunlar — mavjud bazani buzmasdan qo'shiladi
+MIGRATIONS = [
+    ("videos", "playlist", "TEXT NOT NULL DEFAULT ''"),  # YouTube playlist ID (bo'sh bo'lsa — oddiy video)
+    ("users", "total", "INTEGER NOT NULL DEFAULT 0"),     # keshlangan jami Nur (all_totals() endi jadvalni qo'shib chiqmaydi)
+]
+
+_conn: sqlite3.Connection | None = None
+
+
+def conn() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        _conn = sqlite3.connect(DB_FILE, check_same_thread=False)
+        _conn.row_factory = sqlite3.Row
+        _conn.execute("PRAGMA journal_mode=WAL")
+        _conn.executescript(SCHEMA)
+        for table, column, decl in MIGRATIONS:
+            have = {r["name"] for r in _conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            if column not in have:
+                _conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+                if (table, column) == ("users", "total"):  # eski bazada bir marta to'ldiramiz
+                    _conn.execute(
+                        "UPDATE users SET total = base + COALESCE((SELECT SUM(nur) FROM daily WHERE user_id = users.id), 0)"
+                    )
+        _conn.commit()
+    return _conn
+
+
+def backup_to(path: Path) -> Path:
+    """Bazaning izchil nusxasi (WAL bilan ham xavfsiz) — Telegram orqali adminga yuborish uchun."""
+    if path.exists():
+        path.unlink()
+    conn().execute("VACUUM INTO ?", (str(path),))
+    return path
+
+
+# ---------- daraja / hafta ----------
+def level_index(total: int) -> int:
+    idx = 0
+    for i, (_, min_nur) in enumerate(LEVELS):
+        if total >= min_nur:
+            idx = i
+    return idx
+
+
+def level_name(idx: int) -> str:
+    return LEVELS[max(0, min(len(LEVELS) - 1, idx))][0]
+
+
+def week_range(today: date) -> tuple[str, str]:
+    """Dushanba → yakshanba (ISO sanalar)."""
+    mon = today - timedelta(days=today.weekday())
+    return mon.isoformat(), (mon + timedelta(days=6)).isoformat()
+
+
+# ---------- foydalanuvchilar ----------
+def get_user(uid: int) -> sqlite3.Row | None:
+    return conn().execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+
+
+def upsert_user(uid: int, name: str, anon: bool) -> bool:
+    """Yaratadi yoki ism/anonimni yangilaydi. True — yangi foydalanuvchi."""
+    c = conn()
+    now = int(time.time())
+    is_new = c.execute("SELECT 1 FROM users WHERE id=?", (uid,)).fetchone() is None
+    c.execute(
+        "INSERT INTO users (id, name, anon, created, updated) VALUES (?,?,?,?,?) "
+        "ON CONFLICT(id) DO UPDATE SET name=excluded.name, anon=excluded.anon, updated=excluded.updated",
+        (uid, name[:24], 1 if anon else 0, now, now),
+    )
+    c.commit()
+    return is_new
+
+
+def ensure_user(uid: int, name: str) -> None:
+    """Botdan kelgan foydalanuvchini ro'yxatga oladi (bor bo'lsa hech narsa o'zgarmaydi)."""
+    c = conn()
+    now = int(time.time())
+    c.execute("INSERT OR IGNORE INTO users (id, name, created, updated) VALUES (?,?,?,?)", (uid, name[:24], now, now))
+    c.commit()
+
+
+def _refresh_total(c: sqlite3.Connection, uid: int) -> None:
+    """Faqat bitta foydalanuvchining jamini qayta hisoblaydi (uning ~365 qatori) — boshqalarga tegmaydi."""
+    c.execute(
+        "UPDATE users SET total = base + COALESCE((SELECT SUM(nur) FROM daily WHERE user_id = users.id), 0) WHERE id=?",
+        (uid,),
+    )
+
+
+def set_base(uid: int, base: int) -> None:
+    c = conn()
+    c.execute("UPDATE users SET base=? WHERE id=?", (base, uid))
+    _refresh_total(c, uid)
+    c.commit()
+
+
+def upsert_days(uid: int, rows: list[tuple[str, int]]) -> None:
+    c = conn()
+    c.executemany(
+        "INSERT INTO daily (user_id, day, nur) VALUES (?,?,?) ON CONFLICT(user_id, day) DO UPDATE SET nur=excluded.nur",
+        [(uid, day, nur) for day, nur in rows],
+    )
+    _refresh_total(c, uid)
+    c.commit()
+
+
+def user_total(uid: int) -> int:
+    row = conn().execute("SELECT total FROM users WHERE id=?", (uid,)).fetchone()
+    return int(row["total"]) if row else 0
+
+
+def all_totals() -> dict[int, int]:
+    # Keshlangan ustundan — foydalanuvchi soni oshsa ham daily jadvalini qo'shib chiqmaydi
+    rows = conn().execute("SELECT id, total FROM users").fetchall()
+    return {int(r["id"]): int(r["total"]) for r in rows}
+
+
+def week_scores(mon: str, sun: str, uids: list[int] | None = None) -> dict[int, int]:
+    c = conn()
+    if uids is None:
+        rows = c.execute(
+            "SELECT user_id, SUM(nur) AS n FROM daily WHERE day BETWEEN ? AND ? GROUP BY user_id", (mon, sun)
+        ).fetchall()
+    elif not uids:
+        return {}
+    elif len(uids) > 400:
+        # Ko'p bo'lsa IN(...) o'rniga hammasini olib Python'da filtrlaymiz (SQLite parametr chegarasi)
+        wanted = set(uids)
+        rows = [r for r in c.execute(
+            "SELECT user_id, SUM(nur) AS n FROM daily WHERE day BETWEEN ? AND ? GROUP BY user_id", (mon, sun)
+        ).fetchall() if int(r["user_id"]) in wanted]
+    else:
+        marks = ",".join("?" * len(uids))
+        rows = c.execute(
+            f"SELECT user_id, SUM(nur) AS n FROM daily WHERE day BETWEEN ? AND ? AND user_id IN ({marks}) GROUP BY user_id",
+            (mon, sun, *uids),
+        ).fetchall()
+    return {int(r["user_id"]): int(r["n"]) for r in rows}
+
+
+def names(uids: list[int]) -> dict[int, sqlite3.Row]:
+    if not uids:
+        return {}
+    if len(uids) > 400:  # SQLite parametr chegarasi
+        wanted = set(uids)
+        rows = [r for r in conn().execute("SELECT id, name, anon FROM users").fetchall() if int(r["id"]) in wanted]
+    else:
+        marks = ",".join("?" * len(uids))
+        rows = conn().execute(f"SELECT id, name, anon FROM users WHERE id IN ({marks})", uids).fetchall()
+    return {int(r["id"]): r for r in rows}
+
+
+def display_name(row: sqlite3.Row | None, for_self: bool = False) -> str:
+    """Reytingda ko'rinadigan ism. Anonim bo'lsa boshqalarga "Anonim #NNN" (o'ziga — o'z ismi)."""
+    if row is None:
+        return "Foydalanuvchi"
+    if row["anon"] and not for_self:
+        return f"Anonim #{int(row['id']) % 900 + 100}"
+    return (row["name"] or "").strip()[:24] or ("Siz" if for_self else "Foydalanuvchi")
+
+
+# ---------- jamoalar (Telegram guruhlari) ----------
+def create_team(chat_id: int, title: str) -> None:
+    c = conn()
+    c.execute(
+        "INSERT INTO teams (chat_id, title, created) VALUES (?,?,?) ON CONFLICT(chat_id) DO UPDATE SET title=excluded.title",
+        (chat_id, (title or "Jamoa")[:48], int(time.time())),
+    )
+    c.commit()
+
+
+def team_title(chat_id: int) -> str:
+    row = conn().execute("SELECT title FROM teams WHERE chat_id=?", (chat_id,)).fetchone()
+    return row["title"] if row else ""
+
+
+def add_member(chat_id: int, uid: int) -> bool:
+    """True — yangi qo'shildi, False — allaqachon a'zo."""
+    c = conn()
+    cur = c.execute("INSERT OR IGNORE INTO members (chat_id, user_id, joined) VALUES (?,?,?)", (chat_id, uid, int(time.time())))
+    c.commit()
+    return cur.rowcount > 0
+
+
+def is_member(chat_id: int, uid: int) -> bool:
+    return conn().execute("SELECT 1 FROM members WHERE chat_id=? AND user_id=?", (chat_id, uid)).fetchone() is not None
+
+
+def team_members(chat_id: int) -> list[int]:
+    return [int(r["user_id"]) for r in conn().execute("SELECT user_id FROM members WHERE chat_id=?", (chat_id,)).fetchall()]
+
+
+def user_teams(uid: int) -> list[dict]:
+    rows = conn().execute(
+        "SELECT t.chat_id AS id, t.title, (SELECT COUNT(*) FROM members x WHERE x.chat_id = t.chat_id) AS members "
+        "FROM teams t JOIN members m ON m.chat_id = t.chat_id WHERE m.user_id=? ORDER BY m.joined",
+        (uid,),
+    ).fetchall()
+    return [{"id": int(r["id"]), "title": r["title"], "members": int(r["members"])} for r in rows]
+
+
+# ---------- do'stlar ----------
+def add_friend(a: int, b: int) -> bool:
+    """Ikki tomonlama do'stlik. True — yangi, False — allaqachon do'st."""
+    if a == b:
+        return False
+    c = conn()
+    cur = c.execute("INSERT OR IGNORE INTO friends (a, b) VALUES (?,?)", (a, b))
+    c.execute("INSERT OR IGNORE INTO friends (a, b) VALUES (?,?)", (b, a))
+    c.commit()
+    return cur.rowcount > 0
+
+
+def friends_of(uid: int) -> list[int]:
+    return [int(r["b"]) for r in conn().execute("SELECT b FROM friends WHERE a=?", (uid,)).fetchall()]
+
+
+# ---------- umumiy ----------
+def community_week(mon: str, sun: str) -> int:
+    row = conn().execute("SELECT COALESCE(SUM(nur), 0) AS s FROM daily WHERE day BETWEEN ? AND ?", (mon, sun)).fetchone()
+    return int(row["s"])
+
+
+def active_users(mon: str, sun: str) -> list[int]:
+    rows = conn().execute("SELECT DISTINCT user_id FROM daily WHERE day BETWEEN ? AND ? AND nur > 0", (mon, sun)).fetchall()
+    return [int(r["user_id"]) for r in rows]
+
+
+# ---------- video darslar ----------
+def list_videos() -> list[dict]:
+    rows = conn().execute("SELECT * FROM videos ORDER BY section, ord, id").fetchall()
+    return [
+        {
+            "id": int(r["id"]), "section": r["section"], "title": r["title"], "youtubeId": r["yt"],
+            "duration": r["duration"], "gender": r["gender"], "note": r["note"],
+            "playlistId": r["playlist"],
+        }
+        for r in rows
+    ]
+
+
+def save_video(
+    vid: int | None, section: str, title: str, yt: str, duration: str, gender: str, note: str, playlist: str = ""
+) -> int:
+    c = conn()
+    if vid:
+        c.execute(
+            "UPDATE videos SET section=?, title=?, yt=?, duration=?, gender=?, note=?, playlist=? WHERE id=?",
+            (section, title, yt, duration, gender, note, playlist, vid),
+        )
+        c.commit()
+        return vid
+    row = c.execute("SELECT COALESCE(MAX(ord), 0) + 1 AS n FROM videos WHERE section=?", (section,)).fetchone()
+    cur = c.execute(
+        "INSERT INTO videos (section, title, yt, duration, gender, note, playlist, ord, created) VALUES (?,?,?,?,?,?,?,?,?)",
+        (section, title, yt, duration, gender, note, playlist, int(row["n"]), int(time.time())),
+    )
+    c.commit()
+    return int(cur.lastrowid)
+
+
+def add_videos_bulk(section: str, gender: str, items: list[dict]) -> int:
+    """Playlistni darslarga yoyib qo'shadi. items: [{yt, title, duration}]. Takrorlanganini o'tkazib yuboradi."""
+    c = conn()
+    have = {r["yt"] for r in c.execute("SELECT yt FROM videos WHERE section=?", (section,)).fetchall()}
+    row = c.execute("SELECT COALESCE(MAX(ord), 0) AS n FROM videos WHERE section=?", (section,)).fetchone()
+    ordn, now, added = int(row["n"]), int(time.time()), 0
+    for it in items:
+        yt = str(it.get("yt") or "")
+        title = str(it.get("title") or "").strip()[:80]
+        if not yt or not title or yt in have:
+            continue
+        ordn += 1
+        have.add(yt)
+        c.execute(
+            "INSERT INTO videos (section, title, yt, duration, gender, note, playlist, ord, created) VALUES (?,?,?,?,?,?,'',?,?)",
+            (section, title, yt, str(it.get("duration") or "")[:8], gender, "", ordn, now),
+        )
+        added += 1
+    c.commit()
+    return added
+
+
+# ---------- materiallar (PDF va boshqa fayllar) ----------
+# Fayl Telegram serverida turadi, bazada faqat file_id saqlanadi — hosting kerak emas.
+def list_files() -> list[dict]:
+    rows = conn().execute("SELECT * FROM files ORDER BY section, ord, id").fetchall()
+    return [
+        {"id": int(r["id"]), "section": r["section"], "title": r["title"], "kind": r["kind"], "size": int(r["size"])}
+        for r in rows
+    ]
+
+
+def get_file(fid: int) -> sqlite3.Row | None:
+    return conn().execute("SELECT * FROM files WHERE id=?", (fid,)).fetchone()
+
+
+def add_file(section: str, title: str, file_id: str, kind: str, size: int) -> int:
+    c = conn()
+    row = c.execute("SELECT COALESCE(MAX(ord), 0) + 1 AS n FROM files WHERE section=?", (section,)).fetchone()
+    cur = c.execute(
+        "INSERT INTO files (section, title, file_id, kind, size, ord, created) VALUES (?,?,?,?,?,?,?)",
+        (section, title[:80], file_id, kind[:12], max(0, size), int(row["n"]), int(time.time())),
+    )
+    c.commit()
+    return int(cur.lastrowid)
+
+
+def delete_file(fid: int) -> bool:
+    c = conn()
+    cur = c.execute("DELETE FROM files WHERE id=?", (fid,))
+    c.commit()
+    return cur.rowcount > 0
+
+
+def delete_video(vid: int) -> bool:
+    c = conn()
+    cur = c.execute("DELETE FROM videos WHERE id=?", (vid,))
+    c.commit()
+    return cur.rowcount > 0
+
+
+def move_video(vid: int, direction: str) -> bool:
+    """Bo'lim ichida qo'shnisi bilan o'rin almashadi."""
+    c = conn()
+    row = c.execute("SELECT id, section, ord FROM videos WHERE id=?", (vid,)).fetchone()
+    if row is None:
+        return False
+    if direction == "up":
+        nb = c.execute(
+            "SELECT id, ord FROM videos WHERE section=? AND (ord < ? OR (ord = ? AND id < ?)) ORDER BY ord DESC, id DESC LIMIT 1",
+            (row["section"], row["ord"], row["ord"], row["id"]),
+        ).fetchone()
+    else:
+        nb = c.execute(
+            "SELECT id, ord FROM videos WHERE section=? AND (ord > ? OR (ord = ? AND id > ?)) ORDER BY ord ASC, id ASC LIMIT 1",
+            (row["section"], row["ord"], row["ord"], row["id"]),
+        ).fetchone()
+    if nb is None:
+        return False
+    # Teng ord bo'lsa almashtirish ko'rinmaydi — qo'shniga farqli qiymat beramiz
+    a, b = int(row["ord"]), int(nb["ord"])
+    if a == b:
+        b = a - 1 if direction == "up" else a + 1
+    c.execute("UPDATE videos SET ord=? WHERE id=?", (b, row["id"]))
+    c.execute("UPDATE videos SET ord=? WHERE id=?", (a, nb["id"]))
+    c.commit()
+    return True
+
+
+# ---------- reyting jadvali ----------
+def board(
+    scope: str,
+    uid: int,
+    today: date,
+    team_chat_id: int | None = None,
+    limit: int = 30,
+    require_member: bool = True,
+) -> dict:
+    """
+    scope:  liga    — bir darajadagi, shu hafta faol bo'lgan foydalanuvchilar
+            team    — guruh a'zolari (0 Nur bo'lsa ham ko'rinadi)
+            friends — men + do'stlarim
+    Qaytaradi: {title, from, to, level, size, rows: [{rank, name, level, nur, me}], me: {...}, community}
+    Boshqalar haqida faqat: ko'rinadigan ism, daraja, haftalik jami Nur. Tafsilot yo'q.
+    """
+    mon, sun = week_range(today)
+    totals = all_totals()
+    my_level = level_index(totals.get(uid, 0))
+    community = community_week(mon, sun)
+    empty = {"title": "", "from": mon, "to": sun, "level": my_level, "size": 0, "rows": [], "me": None, "community": community}
+
+    if scope == "team":
+        if team_chat_id is None:
+            teams = user_teams(uid)
+            team_chat_id = teams[0]["id"] if teams else None
+        if team_chat_id is None or not team_title(team_chat_id):
+            return empty
+        if require_member and not is_member(team_chat_id, uid):
+            return empty
+        pool, title, include_zero = team_members(team_chat_id), team_title(team_chat_id), True
+    elif scope == "friends":
+        pool, title, include_zero = [uid] + friends_of(uid), "Do'stlar", True
+    else:
+        scope = "liga"
+        pool = [u for u, t in totals.items() if level_index(t) == my_level]
+        title, include_zero = f"{level_name(my_level)} ligasi", False
+
+    scores = week_scores(mon, sun, pool)
+    ranked = [(u, scores.get(u, 0)) for u in pool if include_zero or scores.get(u, 0) > 0]
+    ranked.sort(key=lambda x: (-x[1], x[0]))  # Nur kamayishi bo'yicha; teng bo'lsa barqaror tartib
+    info = names([u for u, _ in ranked] + [uid])
+
+    rows, me = [], None
+    for i, (u, nur) in enumerate(ranked, 1):
+        row = {"rank": i, "name": display_name(info.get(u), for_self=(u == uid)), "level": level_index(totals.get(u, 0)), "nur": nur, "me": u == uid}
+        if u == uid:
+            me = row
+        if i <= limit:
+            rows.append(row)
+    if me is None:
+        me = {"rank": None, "name": display_name(info.get(uid), for_self=True), "level": my_level, "nur": scores.get(uid, 0), "me": True}
+
+    size = len(friends_of(uid)) if scope == "friends" else len(ranked)
+    return {"title": title, "from": mon, "to": sun, "level": my_level, "size": size, "rows": rows, "me": me, "community": community}
