@@ -8,7 +8,7 @@ window.APP_DATA = {
   // ---------- REYTING SERVERI ----------
   // Bot serverining HTTPS manzili (bot/api.py shu yerda ishlaydi), masalan: "https://bomdod-bot.up.railway.app"
   // Bo'sh qoldirilsa — reyting o'chiq, ilova faqat shaxsiy natijalarni (Nur, daraja, nishonlar) ko'rsatadi.
-  apiUrl: "",
+  apiUrl: "https://bomdodnamoz-production.up.railway.app",
 
   // ---------- VIDEO DARSLAR ----------
   // Bo'limlar — Video tabidagi kartochkalar. Tartibi shu yerdagidek chiqadi.
