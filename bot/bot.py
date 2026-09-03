@@ -214,8 +214,7 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
     if message.chat.type != "private":
         # Guruhda web_app tugmalarini Telegram qabul qilmaydi — botga havola beramiz
         await message.answer(
-            "Assalomu alaykum! 🕌 Ilovani shaxsiy chatda oching.
-"
+            "Assalomu alaykum! 🕌 Ilovani shaxsiy chatda oching.\n"
             "Bu guruhni jamoaga aylantirish uchun <code>/jamoa</code> yozing.",
             parse_mode="HTML",
         )
@@ -264,7 +263,8 @@ async def cmd_help(message: Message) -> None:
         "/reyting — bu haftalik Nur natijangiz va o'rningiz\n"
         "/jamoa — guruhda yozilsa, guruh jamoaga aylanadi (haftalik musobaqa)\n"
         "/id — Telegram ID ingiz (admin qilish uchun)\n"
-        "/backup — bazaning nusxasi (faqat admin)\n\n"
+        "/backup — bazaning nusxasi (faqat admin)\n"
+        "/stat — foydalanuvchi statistikasi (faqat admin)\n\n"
         "Bo'limni tanlang:",
         reply_markup=sections_keyboard(),
         parse_mode="HTML",
@@ -498,6 +498,64 @@ async def weekly_backup(bot: Bot) -> None:
             break  # bittasiga yetsa kifoya
 
 
+# ---------- admin statistikasi ----------
+BLOCKS = "▁▂▃▄▅▆▇█"
+WEEKDAYS_SHORT = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"]
+
+
+def spark(values: list[int]) -> str:
+    """Kichik ustunli grafik — Telegram xabarida ko'rinadi."""
+    top = max(values) or 1
+    return "".join(BLOCKS[min(len(BLOCKS) - 1, v * (len(BLOCKS) - 1) // top)] for v in values)
+
+
+@router.message(Command("stat"))
+async def cmd_stat(message: Message) -> None:
+    """Adminlar uchun: nechta foydalanuvchi bor va qanchasi kunlik faol."""
+    user = message.from_user
+    if not user or user.id not in ADMIN_IDS:
+        await message.answer("Bu buyruq faqat adminlar uchun.")
+        return
+    today = datetime.now(TZ).date()
+    s = db.stats(today)
+    total = s["users"] or 1
+    pct = lambda n: f"{n * 100 // total}%"  # noqa: E731
+
+    peak = max((n for _, n in s["chart"]), default=0) or 1
+    bar = lambda n: ("█" * max(1, n * 12 // peak)) if n else "·"  # noqa: E731
+    chart = "\n".join(
+        f"   {WEEKDAYS_SHORT[d.weekday()]}  {bar(n)}  {n}" for d, n in s["chart"]
+    )
+    avg = (s["nur_today"] // s["dau"]) if s["dau"] else 0
+    reminders = sum(1 for u in USERS.values() if u.get("remind"))
+
+    week_spark = spark([n for _, n in s["chart"]])
+    lines = [
+        f"📊 <b>Statistika</b> — {today.strftime('%d.%m.%Y')}",
+        "",
+        "👥 <b>Foydalanuvchilar</b>",
+        f"   Jami: <b>{s['users']}</b>",
+        f"   Bugun faol: <b>{s['dau']}</b> ({pct(s['dau'])})",
+        f"   Haftalik faol: <b>{s['wau']}</b> ({pct(s['wau'])})",
+        f"   Har kuni (7/7): <b>{s['loyal']}</b>",
+        f"   Yangi: bugun {s['new_today']}, haftada {s['new_week']}",
+        "",
+        f"📈 <b>Oxirgi 7 kun</b>  {week_spark}",
+        chart,
+        "",
+        "✨ <b>Nur</b>",
+        f"   Bugun: {s['nur_today']:,}",
+        f"   Bu hafta: {s['nur_week']:,}",
+        f"   O'rtacha: {avg} Nur/kishi",
+        "",
+        f"🤝 Jamoalar: {s['teams']} ({s['team_members']} a'zo) · Do'stlik: {s['friend_pairs']}",
+        f"🔔 Eslatma yoqganlar: {reminders}",
+        f"🎬 Videolar: {s['videos']} · Kitoblar: {s['files']}",
+        f"🗄 Baza: {s['db_kb']} KB",
+    ]
+    await message.answer("\n".join(lines), parse_mode="HTML")
+
+
 @router.message(Command("backup"))
 async def cmd_backup(message: Message) -> None:
     """Admin uchun: bazaning nusxasini hoziroq yuboradi."""
@@ -680,6 +738,7 @@ async def main() -> None:
         BotCommand(command="vaqt", description="Bomdod vaqti"),
         BotCommand(command="eslatma", description="Zikr eslatmalari"),
         BotCommand(command="id", description="Telegram ID im"),
+        BotCommand(command="stat", description="Statistika (admin)"),
         BotCommand(command="help", description="Yordam"),
     ])
 

@@ -434,6 +434,52 @@ def move_video(vid: int, direction: str) -> bool:
     return True
 
 
+# ---------- admin statistikasi ----------
+def stats(today: date) -> dict:
+    """Adminlar uchun umumiy ko'rsatkichlar. Bitta foydalanuvchining ma'lumoti chiqmaydi — faqat yig'indilar."""
+    c = conn()
+    mon, sun = week_range(today)
+    td = today.isoformat()
+    week_ago = (today - timedelta(days=6)).isoformat()
+    now = int(time.time())
+    one = lambda sql, args=(): (c.execute(sql, args).fetchone() or [0])[0] or 0  # noqa: E731
+
+    # Kunlik faollik: oxirgi 7 kun bo'yicha nechta odam Nur to'plagan
+    rows = c.execute(
+        "SELECT day, COUNT(DISTINCT user_id) AS n FROM daily WHERE day BETWEEN ? AND ? AND nur > 0 GROUP BY day",
+        (week_ago, td),
+    ).fetchall()
+    by_day = {r["day"]: int(r["n"]) for r in rows}
+    chart = []
+    for i in range(6, -1, -1):
+        d = today - timedelta(days=i)
+        chart.append((d, by_day.get(d.isoformat(), 0)))
+
+    # Oxirgi 7 kunning hammasida faol bo'lganlar — eng sodiq yadro
+    loyal = one(
+        "SELECT COUNT(*) FROM (SELECT user_id FROM daily WHERE day BETWEEN ? AND ? AND nur > 0 "
+        "GROUP BY user_id HAVING COUNT(DISTINCT day) = 7)",
+        (week_ago, td),
+    )
+    return {
+        "users": one("SELECT COUNT(*) FROM users"),
+        "new_today": one("SELECT COUNT(*) FROM users WHERE created >= ?", (now - 86400,)),
+        "new_week": one("SELECT COUNT(*) FROM users WHERE created >= ?", (now - 7 * 86400,)),
+        "dau": by_day.get(td, 0),
+        "wau": one("SELECT COUNT(DISTINCT user_id) FROM daily WHERE day BETWEEN ? AND ? AND nur > 0", (week_ago, td)),
+        "loyal": loyal,
+        "chart": chart,
+        "nur_today": one("SELECT SUM(nur) FROM daily WHERE day = ?", (td,)),
+        "nur_week": one("SELECT SUM(nur) FROM daily WHERE day BETWEEN ? AND ?", (mon, sun)),
+        "teams": one("SELECT COUNT(*) FROM teams"),
+        "team_members": one("SELECT COUNT(*) FROM members"),
+        "friend_pairs": one("SELECT COUNT(*) FROM friends") // 2,
+        "videos": one("SELECT COUNT(*) FROM videos"),
+        "files": one("SELECT COUNT(*) FROM files"),
+        "db_kb": (DB_FILE.stat().st_size // 1024) if DB_FILE.exists() else 0,
+    }
+
+
 # ---------- reyting jadvali ----------
 def board(
     scope: str,

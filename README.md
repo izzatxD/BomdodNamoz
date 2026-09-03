@@ -72,6 +72,9 @@ bomdodnamozappbot/
 - Eslatma yoqqan foydalanuvchilar `bot/users.json` da saqlanadi (git'ga qo'shilmaydi)
 - `/reyting` — haftalik Nur natijasi va o'rin; guruhda yozilsa — jamoa jadvali
 - `/jamoa` — guruhda yozilsa, guruh **jamoaga** aylanadi (a'zolar bir tugma bilan qo'shiladi)
+- `/stat` — **admin statistikasi**: jami foydalanuvchi, bugungi va haftalik faollar,
+  7 kunlik grafik, yangi qo’shilganlar, Nur yig’indisi, jamoalar va eslatma yoqqanlar soni
+- `/backup` — bazaning nusxasi; har dushanba avtomatik ham yuboriladi (`BACKUP_DAY`)
 - Yakshanba kuni **haftalik xulosa** yuboriladi (`WEEKLY_HOUR`)
 - Reyting API (`api.py`) bot bilan bir jarayonda `API_PORT` da ishlaydi; `db.py` — SQLite (`bot/reyting.db`)
 
