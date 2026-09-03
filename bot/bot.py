@@ -77,17 +77,33 @@ BOT_USERNAME = ""  # main() da to'ldiriladi
 BACKUP_DAY = env_str("BACKUP_DAY", "mon")  # haftalik baza zaxirasi adminga yuboriladigan kun (mon..sun, "" — o'chiq)
 
 if not BOT_TOKEN:
+    # Diagnostika: o'zgaruvchi umuman kelmadimi yoki kelib, qiymati bo'shmi?
+    if "BOT_TOKEN" not in os.environ:
+        holat = "jarayonga UMUMAN yetib kelmadi — Variables da saqlanmagan yoki bu deploy undan oldin boshlangan"
+    elif not os.environ["BOT_TOKEN"].strip():
+        holat = "keldi, lekin QIYMATI BO'SH — Variables da nomi bor, qiymati yo'q"
+    else:
+        holat = "keldi, lekin faqat tirnoq/bo'shliqdan iborat"
+    # Qiymatlar emas, faqat nomlar — sirlar logga tushmasin
+    tashqi = sorted(
+        k for k in os.environ
+        if not k.startswith(("_", "LC_", "LS_"))
+        and k not in {"PATH", "PWD", "HOME", "HOSTNAME", "TERM", "SHLVL", "LANG", "GPG_KEY"}
+        and not k.startswith("PYTHON")
+    )
     raise SystemExit(
         "\n"
         "  BOT_TOKEN ko'rsatilmagan — bot ishga tushmaydi.\n"
         "\n"
-        "  Railway: servis → Variables → New Variable:\n"
-        "      BOT_TOKEN = @BotFather bergan token\n"
+        f"  Holat: {holat}\n"
+        f"  Jarayondagi o'zgaruvchilar ({len(tashqi)} ta): {', '.join(tashqi) or '(hech qanday)'}\n"
         "\n"
-        "  Ixtiyoriy (kerak bo'lsa):\n"
-        "      ADMIN_IDS  = Telegram ID ingiz (botga /id yozing) — /stat, /backup va video paneli uchun\n"
-        f"      WEBAPP_URL = Mini App manzili (hozir: {WEBAPP_URL})\n"
+        "  Railway: servis → Variables → Raw Editor:\n"
+        "      BOT_TOKEN=@BotFather bergan token\n"
+        "      ADMIN_IDS=Telegram ID ingiz\n"
+        "  Yozgach «Update Variables» ni bosing — shundan keyingina yangi deploy boshlanadi.\n"
         "\n"
+        f"  WEBAPP_URL (hozir): {WEBAPP_URL}\n"
         "  Lokal ishlatish uchun: bot/.env faylini .env.example dan nusxalang.\n"
     )
 
