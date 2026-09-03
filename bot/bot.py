@@ -1210,6 +1210,12 @@ async def main() -> None:
 
     me = await bot.get_me()
     BOT_USERNAME = me.username or ""
+    # Bot avval konstruktorda (MenuBuilder kabi) ishlagan bo'lsa, u webhook o'rnatib ketgan bo'lishi mumkin —
+    # webhook turganda polling ishlamaydi. Har ishga tushganda tozalaymiz; kutayotgan xabarlar yo'qolmaydi.
+    try:
+        await bot.delete_webhook(drop_pending_updates=False)
+    except Exception as e:  # noqa: BLE001
+        logging.warning("Webhook o'chirilmadi: %s", e)
     await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="Ilova", web_app=WebAppInfo(url=WEBAPP_URL)))
     commands = [
         BotCommand(command="start", description="Boshlash"),
