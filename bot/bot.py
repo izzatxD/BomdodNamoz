@@ -582,6 +582,16 @@ async def cmd_stat(message: Message) -> None:
     avg = (s["nur_today"] // s["dau"]) if s["dau"] else 0
     reminders = sum(1 for u in USERS.values() if u.get("remind"))
 
+    # Disk holati. "vaqtinchalik" chiqsa — Volume ulanmagan va baza har deploy'da o'chadi.
+    since = db.data_since()
+    if db.DATA_DIR_PERSISTENT and since:
+        days_up = (int(datetime.now(TZ).timestamp()) - since) // 86400
+        disk = f"doimiy · {days_up} kundan beri" if days_up else "doimiy · bugundan"
+    elif db.DATA_DIR_PERSISTENT:
+        disk = "doimiy"
+    else:
+        disk = "⚠️ VAQTINCHALIK — har deploy'da o'chadi"
+
     week_spark = spark([n for _, n in s["chart"]])
     lines = [
         f"📊 <b>Statistika</b> — {today.strftime('%d.%m.%Y')}",
@@ -604,7 +614,7 @@ async def cmd_stat(message: Message) -> None:
         f"🤝 Jamoalar: {s['teams']} ({s['team_members']} a'zo) · Do'stlik: {s['friend_pairs']}",
         f"🔔 Eslatma yoqganlar: {reminders}",
         f"🎬 Videolar: {s['videos']} · Kitoblar: {s['files']}",
-        f"🗄 Baza: {s['db_kb']} KB",
+        f"🗄 Baza: {s['db_kb']} KB · {disk}",
     ]
     await message.answer("\n".join(lines), parse_mode="HTML")
 
