@@ -148,20 +148,40 @@ window.App = (function () {
     const now = new Date(), t = Vaqt.times(now, currentLng()), h = Vaqt.hijri(now);
     lastTimes = t; lastDay = Store.today();
     $("#hero-date").textContent = gregorianDate() + (h ? ` · ${h.day} ${HIJRI[h.month - 1] || h.month} ${h.year}` : "");
-    $("#fajr-time").textContent = t.bomdod; $("#sunrise-time").textContent = t.quyosh;
-    renderAllTimes(t);
-    startCountdown(t.bomdod, t.quyosh);
+    startCountdown();
   }
   const NAMES = { bomdod: "Bomdod", quyosh: "Quyosh", peshin: "Peshin", asr: "Asr", shom: "Shom", xufton: "Xufton" };
   function toMin(s) { const [a, b] = s.split(":").map(Number); return a * 60 + b; }
+
+  // Kunning qaysi qismidamiz: hozir qaysi namoz vaqti va keyingisi nima.
+  // Namoz oynalari: bomdod → quyosh | peshin → asr | asr → shom | shom → xufton | xufton → ertangi bomdod.
+  // Quyosh chiqishidan peshingacha — namoz vaqti emas (faqat kutish).
+  function prayerState(t, nowMin) {
+    const m = {}; Object.keys(NAMES).forEach((k) => (m[k] = toMin(t[k])));
+    if (nowMin < m.bomdod)  return { now: "xufton", next: "bomdod", at: m.bomdod, left: m.bomdod - nowMin };
+    if (nowMin < m.quyosh)  return { now: "bomdod", next: "quyosh", at: m.quyosh, left: m.quyosh - nowMin };
+    if (nowMin < m.peshin)  return { now: null,     next: "peshin", at: m.peshin, left: m.peshin - nowMin };
+    if (nowMin < m.asr)     return { now: "peshin", next: "asr",    at: m.asr,    left: m.asr - nowMin };
+    if (nowMin < m.shom)    return { now: "asr",    next: "shom",   at: m.shom,   left: m.shom - nowMin };
+    if (nowMin < m.xufton)  return { now: "shom",   next: "xufton", at: m.xufton, left: m.xufton - nowMin };
+    return { now: "xufton", next: "bomdod", at: m.bomdod, left: 24 * 60 - nowMin + m.bomdod, tomorrow: true };
+  }
+
+  // Hero: chapda keyingi namoz (kun bo'yi foydali), o'ngda hozirgi holat
+  function renderHero(t, s) {
+    $("#next-label").textContent = s.tomorrow ? `Keyingi · ${NAMES[s.next]} (ertaga)` : `Keyingi · ${NAMES[s.next]}`;
+    $("#next-time").textContent = t[s.next];
+    const side = $("#side-time"), lab = $("#side-label");
+    if (s.now === "bomdod") { lab.textContent = "Quyosh chiqishi"; side.textContent = t.quyosh; }
+    else if (s.now) { lab.textContent = `Hozir · ${NAMES[s.now]}`; side.textContent = t[s.now]; }
+    else { lab.textContent = "Bomdod o'tdi"; side.textContent = t.bomdod; }
+  }
+
   // Hero'dagi 6 ta vaqt; hozir davom etayotgan namoz vaqti yoritiladi
-  function renderAllTimes(t) {
+  function renderAllTimes(t, s) {
     const el = $("#times-all"); if (!el || !t) return;
-    const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
-    let cur = "xufton";                                    // yarim tundan bomdodgacha xufton vaqti davom etadi
-    ["bomdod", "peshin", "asr", "shom", "xufton"].forEach((k) => { if (toMin(t[k]) <= nowMin) cur = k; });
-    if (cur === "bomdod" && nowMin >= toMin(t.quyosh)) cur = null;   // quyosh chiqdi — peshingacha namoz vaqti emas
-    el.innerHTML = Object.keys(NAMES).map((k) => `<div class="${k === cur ? "now" : ""}"><small>${NAMES[k]}</small><b>${t[k]}</b></div>`).join("");
+    el.innerHTML = Object.keys(NAMES).map((k) =>
+      `<div class="${k === s.now ? "now" : ""} ${k === s.next ? "next" : ""}"><small>${NAMES[k]}</small><b>${t[k]}</b></div>`).join("");
   }
 
   // ---------- joylashuv (GPS) ----------
@@ -215,18 +235,24 @@ window.App = (function () {
   const WEEKDAYS = ["Yakshanba","Dushanba","Seshanba","Chorshanba","Payshanba","Juma","Shanba"];
   const HIJRI = ["Muharram","Safar","Rabi'ul-avval","Rabi'ul-oxir","Jumadul-avval","Jumadul-oxir","Rajab","Sha'bon","Ramazon","Shavvol","Zulqa'da","Zulhijja"];
   function gregorianDate() { const d = new Date(); return `${WEEKDAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`; }
-  function startCountdown(fajr, sunrise) {
+  function startCountdown() {
     clearInterval(countdownTimer);
     const tick = () => {
       if (Store.today() !== lastDay) return loadPrayerTimes();   // yarim tun o'tdi — yangi kunning vaqtlari
-      const now = new Date();
-      const nowMin = now.getHours() * 60 + now.getMinutes(), fajrMin = toMin(fajr), sunMin = toMin(sunrise);
-      let msg, live = false;
-      if (nowMin < fajrMin) msg = `Bomdodgacha ${fmt(fajrMin - nowMin)} qoldi`;
-      else if (nowMin < sunMin) { msg = `Bomdod vaqti — quyosh chiqishigacha ${fmt(sunMin - nowMin)}`; live = true; }
-      else msg = `Bomdod vaqti o'tdi · ertangi bomdodgacha ${fmt(24 * 60 - nowMin + fajrMin)}`;
-      $("#countdown").textContent = msg; $("#countdown").classList.toggle("live", live);
-      renderAllTimes(lastTimes);
+      if (!lastTimes) return;
+      const now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes();
+      const s = prayerState(lastTimes, nowMin);
+      renderHero(lastTimes, s);
+      renderAllTimes(lastTimes, s);
+      // Har doim keyingi voqeagacha qolgan vaqt — kun bo'yi foydali
+      const msg = s.now === "bomdod"
+        ? `Bomdod vaqti — quyosh chiqishigacha ${fmt(s.left)}`
+        : s.now
+          ? `${NAMES[s.now]} vaqti — ${NAMES[s.next]}gacha ${fmt(s.left)}`
+          : `${NAMES[s.next]}gacha ${fmt(s.left)}`;
+      $("#countdown").textContent = msg;
+      $("#countdown").classList.toggle("live", !!s.now);        // namoz vaqti davom etayotganda yashil nuqta
+      $("#countdown").classList.toggle("soon", !s.now && s.left <= 30);
     };
     tick(); countdownTimer = setInterval(tick, 30000);
   }
