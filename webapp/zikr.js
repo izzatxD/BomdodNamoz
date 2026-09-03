@@ -1,5 +1,5 @@
 // ============================================================
-//  ZIKR moduli — tong/tun zikrlari (hisoblagich bilan), tasbih, 30 kunlik odat
+//  ZIKR moduli — tongi/tungi zikrlar (hisoblagich bilan), tasbih, 30 kunlik odat
 // ============================================================
 window.Zikr = (function () {
   const Z = window.ZIKR_DATA, D = window.APP_DATA;
@@ -118,7 +118,7 @@ window.Zikr = (function () {
     const rec = todayRec(), list = Z[k], done = rec[k] || [];
     const p = programInfo();
     const need = p.started ? (p.week.tasks.find((t) => t.type === k) || { ids: [] }).ids : [];
-    const title = k === "tong" ? "Tong zikrlari" : "Tun zikrlari";
+    const title = k === "tong" ? "Tongi zikrlar" : "Tungi zikrlar";
     const when = k === "tong" ? "Bomdoddan keyin — quyosh chiqquncha" : "Asrdan keyin — xuftongacha";
     return `<div class="card hero-card"><h3>${title}</h3><p class="small muted" style="margin-top:0">${when}</p>
         <div class="progress"><div class="progress-bar" style="width:${done.length / list.length * 100}%"></div></div>

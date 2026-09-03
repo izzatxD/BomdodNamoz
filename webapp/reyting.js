@@ -9,7 +9,7 @@ window.Reyting = (function () {
   const DAYS = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
   const MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
   const CATS = [
-    { id: "zikr",   label: "Tong va tun zikrlari", icon: "sunrise",  hint: "har zikr 2 · to'liq to'plam +30" },
+    { id: "zikr",   label: "Tongi va tungi zikrlar", icon: "sunrise",  hint: "har zikr 2 · to'liq to'plam +30" },
     { id: "tasbih", label: "Tasbih",               icon: "beads",    hint: "har 33 marta — 5" },
     { id: "qazo",   label: "Qazo namozlar",        icon: "calendar", hint: "har namoz 15 · faqat sizga ko'rinadi", private: true },
     { id: "ilm",    label: "Arab tili darslari",   icon: "letters",  hint: "har dars 40 (test 80%+)" },

@@ -5,7 +5,7 @@
 
 window.ZIKR_DATA = {
 
-  // ---------- TONG ZIKRLARI (bomdoddan keyin — quyosh chiqquncha) ----------
+  // ---------- TONGI ZIKRLAR (bomdoddan keyin — quyosh chiqquncha) ----------
   tong: [
     {
       id: "t_kursi", title: "Oyatul Kursiy", count: 1,
@@ -102,7 +102,7 @@ window.ZIKR_DATA = {
     },
   ],
 
-  // ---------- TUN (KECHQURUN) ZIKRLARI (asrdan keyin — xuftongacha) ----------
+  // ---------- TUNGI (KECHQURUN) ZIKRLAR (asrdan keyin — xuftongacha) ----------
   tun: [
     {
       id: "n_kursi", title: "Oyatul Kursiy", count: 1, sameAs: "t_kursi",
@@ -165,36 +165,36 @@ window.ZIKR_DATA = {
     weeks: [
       {
         week: 1, title: "Boshlash — 5 daqiqa",
-        desc: "Eng qisqa va eng fazilatli zikrlar bilan tanishamiz. Faqat 3 ta tong zikri va 33 tasbih.",
+        desc: "Eng qisqa va eng fazilatli zikrlar bilan tanishamiz. Faqat 3 ta tongi zikr va 33 tasbih.",
         tasks: [
-          { type: "tong", ids: ["t_asbahna", "t_hasbi", "t_bismillah"], label: "3 ta tong zikri" },
+          { type: "tong", ids: ["t_asbahna", "t_hasbi", "t_bismillah"], label: "3 ta tongi zikr" },
           { type: "tasbih", ids: ["subhanalloh"], label: "33 marta Subhaanalloh" },
         ]
       },
       {
         week: 2, title: "Kechqurun qo'shiladi — 10 daqiqa",
-        desc: "Tong zikrlariga kechqurungi 3 ta zikr va Oyatul Kursiy qo'shiladi.",
+        desc: "Tongi zikrlarga kechqurungi 3 ta zikr va Oyatul Kursiy qo'shiladi.",
         tasks: [
-          { type: "tong", ids: ["t_kursi", "t_asbahna", "t_hasbi", "t_bismillah", "t_sayyid"], label: "5 ta tong zikri" },
-          { type: "tun", ids: ["n_amsayna", "n_hasbi", "n_bismillah"], label: "3 ta tun zikri" },
+          { type: "tong", ids: ["t_kursi", "t_asbahna", "t_hasbi", "t_bismillah", "t_sayyid"], label: "5 ta tongi zikr" },
+          { type: "tun", ids: ["n_amsayna", "n_hasbi", "n_bismillah"], label: "3 ta tungi zikr" },
           { type: "tasbih", ids: ["subhanalloh", "alhamdulillah", "allohuakbar"], label: "33-33-34 tasbih" },
         ]
       },
       {
         week: 3, title: "Kengaytirish — 15 daqiqa",
-        desc: "Tong zikrlarining ko'p qismi va tun zikrlarining yarmi. 100 marta istig'for qo'shiladi.",
+        desc: "Tongi zikrlarning ko'p qismi va tungi zikrlarning yarmi. 100 marta istig'for qo'shiladi.",
         tasks: [
-          { type: "tong", ids: ["t_kursi", "t_ixlos3", "t_asbahna", "t_bika", "t_sayyid", "t_afini", "t_hasbi", "t_bismillah", "t_roziytu"], label: "9 ta tong zikri" },
-          { type: "tun", ids: ["n_kursi", "n_amsayna", "n_bika", "n_sayyid", "n_hasbi", "n_bismillah", "n_auzu"], label: "7 ta tun zikri" },
+          { type: "tong", ids: ["t_kursi", "t_ixlos3", "t_asbahna", "t_bika", "t_sayyid", "t_afini", "t_hasbi", "t_bismillah", "t_roziytu"], label: "9 ta tongi zikr" },
+          { type: "tun", ids: ["n_kursi", "n_amsayna", "n_bika", "n_sayyid", "n_hasbi", "n_bismillah", "n_auzu"], label: "7 ta tungi zikr" },
           { type: "tasbih", ids: ["subhanalloh", "alhamdulillah", "allohuakbar", "istighfar"], label: "Tasbih + 100 istig'for" },
         ]
       },
       {
         week: 4, title: "To'liq — 20 daqiqa",
-        desc: "Tong va tun zikrlarining to'liq to'plami. Bu — Payg'ambarimiz (s.a.v.) sunnati bo'yicha kunlik himoya.",
+        desc: "Tongi va tungi zikrlarning to'liq to'plami. Bu — Payg'ambarimiz (s.a.v.) sunnati bo'yicha kunlik himoya.",
         tasks: [
-          { type: "tong", ids: [], label: "Barcha tong zikrlari" },
-          { type: "tun", ids: [], label: "Barcha tun zikrlari" },
+          { type: "tong", ids: [], label: "Barcha tongi zikrlar" },
+          { type: "tun", ids: [], label: "Barcha tungi zikrlar" },
           { type: "tasbih", ids: ["subhanalloh", "alhamdulillah", "allohuakbar", "istighfar", "salavot"], label: "Tasbih + istig'for + salavot" },
         ]
       },

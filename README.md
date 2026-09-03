@@ -12,7 +12,7 @@ bomdodnamozappbot/
 │   ├── app.js            ← yadro: tablar, namoz qadamlari, suralar, video, vaqt
 │   ├── store.js          ← saqlash: Telegram CloudStorage + localStorage
 │   ├── vaqt.js           ← namoz vaqtlari hisoblagichi (Muftiyat usuli, internetsiz)
-│   ├── zikr.js           ← tong/tun zikrlari, tasbih, 30 kunlik odat dasturi
+│   ├── zikr.js           ← tongi/tungi zikrlar, tasbih, 30 kunlik odat dasturi
 │   ├── arabic.js         ← arab tili darslari va testlar
 │   ├── qazo.js           ← qazo namozlar hisobi
 │   ├── nur.js            ← Nur ballari, darajalar, nishonlar (serversiz ishlaydi)
@@ -22,7 +22,7 @@ bomdodnamozappbot/
 │   ├── data.js           ← KONTENT: suralar, duolar, qadamlar, videolar, materiallar, shaharlar
 │   ├── files/            ← ilova bilan birga tarqaladigan materiallar
 │   │   └── muallim_soniy.pdf   ← «Muallim soniy» darsligi (44 bet)
-│   ├── data_zikr.js      ← KONTENT: tong/tun zikrlari, tasbih, odat dasturi haftalari
+│   ├── data_zikr.js      ← KONTENT: tongi/tungi zikrlar, tasbih, odat dasturi haftalari
 │   └── data_arabic.js    ← KONTENT: 28 harf, 11 ta dars
 ├── bot/                  ← Telegram bot (Python, aiogram 3)
 │   ├── bot.py

@@ -3,7 +3,7 @@ Bomdod namozi — Telegram bot (aiogram 3)
 =========================================
 • Mini App'ni ochadigan tugmalar
 • Bomdod vaqti (/vaqt)
-• Tong va tun zikrlari uchun kunlik eslatmalar (/eslatma)
+• Tongi va tungi zikrlar uchun kunlik eslatmalar (/eslatma)
 • Reyting: jamoa (/jamoa), do'stlar, haftalik xulosa; Mini App uchun HTTP API (api.py + db.py)
 
 Ishga tushirish:
@@ -65,8 +65,8 @@ BOT_TOKEN = env_str("BOT_TOKEN")
 # Mini App manzili. Ko'rsatilmasa — shu repozitoriyning GitHub Pages manzili.
 WEBAPP_URL = env_str("WEBAPP_URL", "https://izzatxd.github.io/BomdodNamoz/")
 TZ = ZoneInfo(os.getenv("TZ", "Asia/Tashkent"))
-MORNING_HOUR = int(os.getenv("MORNING_HOUR", "6"))    # tong zikri eslatmasi (soat)
-EVENING_HOUR = int(os.getenv("EVENING_HOUR", "18"))   # tun zikri eslatmasi (soat)
+MORNING_HOUR = int(os.getenv("MORNING_HOUR", "6"))    # tongi zikr eslatmasi (soat)
+EVENING_HOUR = int(os.getenv("EVENING_HOUR", "18"))   # tungi zikr eslatmasi (soat)
 USERS_FILE = db.DATA_DIR / "users.json"  # DATA_DIR — Railway volume (masalan /data); bo'lmasa bot/ papkasi
 API_PORT = int(os.getenv("PORT") or os.getenv("API_PORT") or "8080")  # Mini App shu portga murojaat qiladi (hosting PORT bersa — o'sha)
 WEEKLY_HOUR = int(os.getenv("WEEKLY_HOUR", "20"))  # yakshanba kuni haftalik reyting xulosasi (soat)
@@ -285,7 +285,7 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
         f"Assalomu alaykum, {name}! 🕌\n\n"
         "Bu ilova orqali:\n"
         "🧎 <b>Bomdod namozini</b> qadam-baqadam o'rganasiz (erkak/ayol)\n"
-        "📿 <b>Tong va tun zikrlarini</b> hisoblagich bilan o'qiysiz\n"
+        "📿 <b>Tongi va tungi zikrlarni</b> hisoblagich bilan o'qiysiz\n"
         "🌱 <b>30 kunlik dastur</b> bilan zikr odatini shakllantirasiz\n"
         "🔤 <b>Arab alifbosini</b> o'rganib, Qur'on o'qishni boshlaysiz\n"
         "🗓️ <b>Qazo namozlaringizni</b> hisoblab borasiz\n"
@@ -312,7 +312,7 @@ async def cmd_help(message: Message) -> None:
         "/app — ilovani ochish\n"
         "/vaqt — Toshkent uchun bomdod vaqti\n"
         "/vaqt Samarqand — boshqa shahar uchun\n"
-        "/eslatma — tong va tun zikri eslatmalarini yoqish/o'chirish\n"
+        "/eslatma — tongi va tungi zikr eslatmalarini yoqish/o'chirish\n"
         "/reyting — bu haftalik Nur natijangiz va o'rningiz\n"
         "/jamoa — guruhda yozilsa, guruh jamoaga aylanadi (haftalik musobaqa)\n"
         "/id — Telegram ID ingiz (admin qilish uchun)\n"
@@ -369,8 +369,8 @@ async def cmd_eslatma(message: Message) -> None:
     await message.answer(
         "🔔 <b>Zikr eslatmalari</b>\n\n"
         f"Holat: <b>{'yoqilgan ✅' if on else 'o‘chirilgan'}</b>\n\n"
-        f"Yoqilsa har kuni soat <b>{MORNING_HOUR:02d}:00</b> da tong zikri va "
-        f"<b>{EVENING_HOUR:02d}:00</b> da tun zikri uchun eslatma keladi (Toshkent vaqti).\n"
+        f"Yoqilsa har kuni soat <b>{MORNING_HOUR:02d}:00</b> da tongi zikr va "
+        f"<b>{EVENING_HOUR:02d}:00</b> da tungi zikr uchun eslatma keladi (Toshkent vaqti).\n"
         "Odat shakllantirishda eng muhim narsa — har kuni bir xil vaqtda eslatish.",
         reply_markup=remind_keyboard(on),
         parse_mode="HTML",
@@ -720,14 +720,14 @@ async def send_reminders(bot: Bot, kind: str) -> None:
     if kind == "tong":
         title, tip = MORNING_TIPS[day % len(MORNING_TIPS)]
         text = (
-            "🌅 <b>Xayrli tong!</b> Tong zikrlari vaqti.\n\n"
+            "🌅 <b>Xayrli tong!</b> Tongi zikrlar vaqti.\n\n"
             f"Bugungi zikr: <b>{title}</b>\n<i>{tip}</i>\n\n"
             "Ilovada hisoblagich bilan o'qing va odat zanjirini uzmang 🔥"
         )
     else:
         title, tip = EVENING_TIPS[day % len(EVENING_TIPS)]
         text = (
-            "🌙 <b>Xayrli kech!</b> Tun zikrlari vaqti.\n\n"
+            "🌙 <b>Xayrli kech!</b> Tungi zikrlar vaqti.\n\n"
             f"Bugungi zikr: <b>{title}</b>\n<i>{tip}</i>\n\n"
             "5 daqiqa ajrating — bugungi vazifani yakunlang ✅"
         )

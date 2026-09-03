@@ -2,7 +2,7 @@
 //  NUR moduli — harakat va davomiylik o'lchovi: ball, daraja, nishonlar
 //  Nur savobni EMAS, faqat harakat va davomiylikni o'lchaydi.
 //  Hisob mavjud yozuvlardan olinadi: days{} (zikr.js), qazo{} (qazo.js), arab{} (arabic.js)
-//  days[kun] = { t: tong zikrlari, n: tun zikrlari, s: {tasbih: soni}, ok: vazifalar to'liq,
+//  days[kun] = { t: tongi zikrlar, n: tungi zikrlar, s: {tasbih: soni}, ok: vazifalar to'liq,
 //                q: bugun o'qilgan qazo, a: bugun tugatilgan darslar }
 //  Chegaralar (CAP) bot/api.py bilan BIR XIL bo'lishi shart — server ularni qayta qo'llaydi.
 // ============================================================
@@ -33,8 +33,8 @@ window.Nur = (function () {
     { id: "streak7",  name: "Bir hafta",      desc: "7 kun ketma-ket kunlik vazifalar",      icon: "flame",    test: (c) => c.maxStreak >= 7 },
     { id: "streak30", name: "30 kun",         desc: "30 kunlik dastur uzilishsiz",           icon: "trophy",   test: (c) => c.maxStreak >= 30 },
     { id: "streak40", name: "Qirq kun",       desc: "40 kun ketma-ket — odat mustahkam",     icon: "crown",    test: (c) => c.maxStreak >= 40 },
-    { id: "tong",     name: "Tong sohibi",    desc: "Bir kunda barcha tong zikrlari",         icon: "sunrise",  test: (c) => c.tongFull },
-    { id: "tun",      name: "Tun sohibi",     desc: "Bir kunda barcha tun zikrlari",          icon: "moon",     test: (c) => c.tunFull },
+    { id: "tong",     name: "Tong sohibi",    desc: "Bir kunda barcha tongi zikrlar",         icon: "sunrise",  test: (c) => c.tongFull },
+    { id: "tun",      name: "Tun sohibi",     desc: "Bir kunda barcha tungi zikrlar",          icon: "moon",     test: (c) => c.tunFull },
     { id: "tasbih1k", name: "Ming tasbih",    desc: "Bir kunda 1000 marta tasbih",            icon: "beads",    test: (c) => c.maxTaps >= 1000 },
     { id: "qazo100",  name: "Qarz to'lovchi", desc: "100 ta qazo namoz o'qildi",              icon: "calendar", test: (c) => c.qazoDone >= 100, private: true },
     { id: "qazo0",    name: "Qarzsiz",        desc: "Barcha qazo namozlar tugatildi",         icon: "check",    test: (c) => c.qazoTotal > 0 && c.qazoLeft === 0, private: true },

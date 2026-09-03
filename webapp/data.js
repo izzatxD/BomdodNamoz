@@ -24,7 +24,7 @@ window.APP_DATA = {
     { id: "nafl",    title: "Nafl namozlar",        icon: "star",    desc: "Tahajjud, duho, istixora, avvobin, tasbih" },
     // sequential: darslar ketma-ket ochiladi — oldingisi to'liq ko'rilmaguncha keyingisi qulflangan
     { id: "arab",    title: "Arab tili va tajvid",  icon: "letters", desc: "Harflar, harakatlar, Qur'on o'qish qoidalari", sequential: true },
-    { id: "zikr",    title: "Zikr va duolar",       icon: "beads",   desc: "Tong va tun zikrlari, kundalik duolar" },
+    { id: "zikr",    title: "Zikr va duolar",       icon: "beads",   desc: "Tongi va tungi zikrlar, kundalik duolar" },
     { id: "boshqa",  title: "Boshqa darslar",       icon: "book",    desc: "Umumiy mavzular" },
   ],
 
