@@ -55,12 +55,13 @@ window.Api = (function () {
   function moveVideo(id, dir) { return call("/api/admin/video/move", { id, dir }); }
   function deleteFile(id) { return call("/api/admin/file/delete", { id }); }
   function lookup(url) { return call("/api/admin/lookup", { url }); }
+  function adminStats() { return call("/api/admin/stats"); }   // faqat adminlar; faqat yig'indilar
 
   Store.onChange((key) => { if (SYNC_KEYS.includes(key)) scheduleSync(); });
 
   return {
     enabled, sync, scheduleSync, board, onSync,
-    content, saveVideo, deleteVideo, moveVideo, deleteFile, lookup,
+    content, saveVideo, deleteVideo, moveVideo, deleteFile, lookup, adminStats,
     get meta() { return meta; }, get error() { return lastError; },
   };
 })();

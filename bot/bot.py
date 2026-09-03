@@ -17,15 +17,18 @@ import html
 import json
 import logging
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from aiohttp import web
 from aiogram import Bot, Dispatcher, F, Router
+from aiogram.exceptions import TelegramBadRequest, TelegramForbiddenError, TelegramRetryAfter
 from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (
     BotCommand,
+    BotCommandScopeChat,
     CallbackQuery,
     FSInputFile,
     InlineKeyboardButton,
@@ -149,6 +152,14 @@ SECTIONS: dict[str, str] = {
 # Admin yuborgan, lekin bo'limi hali tanlanmagan fayllar: {admin_id: (file_id, nom, tur, hajm)}
 _pending_files: dict[int, tuple[str, str, str, int]] = {}
 
+# E'lon (broadcast) qoralamalari: {admin_id: {"state": "await"|"ready", "chat", "msg", "preview", "segment"}}
+_drafts: dict[int, dict] = {}
+# Bir vaqtda faqat bitta e'lon yuboriladi; "stop" — admin «To'xtatish»ni bosdi
+_broadcast: dict = {"running": False, "stop": False}
+SEGMENTS = {"hamma": "👥 Hammaga", "faol": "🔥 Shu hafta faollar", "uxlagan": "😴 14 kun kirmaganlar"}
+COUNT_FILE = db.DATA_DIR / ".users_count"        # health_check: foydalanuvchilar soni kamaysa — ogohlantirish
+LAST_BACKUP_FILE = db.DATA_DIR / ".last_backup"  # admin sahifasida "oxirgi zaxira" uchun
+
 # Eslatmalar bilan yuboriladigan qisqa zikrlar (kunlar bo'yicha almashib turadi)
 MORNING_TIPS = [
     ("Sayyidul istig'for", "Allohumma anta robbiy laa ilaaha illaa ant, xolaqtaniy va ana 'abduk..."),
@@ -264,6 +275,7 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
     save_users(USERS)
     if user:
         db.ensure_user(user.id, name)
+        db.set_blocked(user.id, False)  # qaytib keldi — eslatma va e'lonlar yana boradi
     if message.chat.type != "private":
         # Guruhda web_app tugmalarini Telegram qabul qilmaydi — botga havola beramiz
         await message.answer(
@@ -273,6 +285,12 @@ async def cmd_start(message: Message, command: CommandObject) -> None:
         )
         return
     arg = (command.args or "").strip() if command else ""
+    if arg in ("admin", "xabar") and user and user.id in ADMIN_IDS:  # ilovadagi admin sahifasi tugmalari
+        if arg == "xabar":
+            await start_broadcast(message.bot, message.chat.id, user.id)
+        else:
+            await send_admin_panel(message.bot, message.chat.id)
+        return
     if arg.startswith("app_"):  # guruhdagi havoladan: ilovani kerakli bo'limda ochish
         await message.answer("Ilovani ochish 👇", reply_markup=open_app_keyboard("📊 Reytingni ochish", arg[4:] or None))
         return
@@ -316,8 +334,7 @@ async def cmd_help(message: Message) -> None:
         "/reyting — bu haftalik Nur natijangiz va o'rningiz\n"
         "/jamoa — guruhda yozilsa, guruh jamoaga aylanadi (haftalik musobaqa)\n"
         "/id — Telegram ID ingiz (admin qilish uchun)\n"
-        "/backup — bazaning nusxasi (faqat admin)\n"
-        "/stat — foydalanuvchi statistikasi (faqat admin)\n\n"
+        "/admin — admin paneli (faqat admin)\n\n"
         "Bo'limni tanlang:",
         reply_markup=sections_keyboard(),
         parse_mode="HTML",
@@ -456,6 +473,290 @@ async def cmd_reyting(message: Message) -> None:
 
 
 
+# ---------- admin: panel, e'lon (broadcast), ogohlantirishlar ----------
+def stop_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="⏹ To'xtatish", callback_data="bc:stop")]])
+
+
+def admin_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🛠 Admin panelini ochish", web_app=WebAppInfo(url=app_url("admin")))],
+        [InlineKeyboardButton(text="📣 E'lon yuborish", callback_data="bc:new"),
+         InlineKeyboardButton(text="📊 Statistika", callback_data="adm:stat")],
+    ])
+
+
+async def send_admin_panel(bot: Bot, chat_id: int) -> None:
+    await bot.send_message(
+        chat_id,
+        "🛠 <b>Admin</b>\n\n"
+        "/xabar — hammaga yoki tanlangan guruhga e'lon\n"
+        "/stat — statistika (faqat yig'indilar)\n"
+        "/backup — bazaning nusxasini olish\n"
+        "/admin — shu ro'yxat\n\n"
+        "📎 <b>PDF yoki kitob</b> — faylni shu chatga yuboring, qaysi bo'limga qo'shishni so'rayman.\n"
+        "🎬 <b>Video</b> — ilovadagi Video bo'limida «Video qo'shish».\n"
+        "📊 <b>Statistika, grafik, server holati</b> — pastdagi tugma.",
+        reply_markup=admin_keyboard(),
+        parse_mode="HTML",
+    )
+
+
+@router.message(Command("admin"))
+async def cmd_admin(message: Message) -> None:
+    user = message.from_user
+    if not user or user.id not in ADMIN_IDS:
+        await message.answer("Bu buyruq faqat adminlar uchun.")
+        return
+    await send_admin_panel(message.bot, message.chat.id)
+
+
+async def start_broadcast(bot: Bot, chat_id: int, uid: int, text: str = "") -> None:
+    if _broadcast["running"]:
+        await bot.send_message(chat_id, "Hozir boshqa e'lon yuborilmoqda — tugashini kuting.")
+        return
+    if text:
+        # /xabar <matn> — qisqa yo'l: matnning o'zi qoralama bo'ladi
+        draft = await bot.send_message(chat_id, text)
+        _drafts[uid] = {"state": "ready", "chat": chat_id, "msg": draft.message_id, "preview": text[:80]}
+        await ask_segment(bot, chat_id)
+        return
+    _drafts[uid] = {"state": "await"}
+    await bot.send_message(
+        chat_id,
+        "📣 <b>E'lon</b>\n\n"
+        "Yuboriladigan xabarni shu yerga yozing — matn, rasm yoki video (izoh bilan). "
+        "Formatlash (qalin, havola) saqlanadi. Xabar tagida «Ilovani ochish» tugmasi bo'ladi.\n\n"
+        "Bekor qilish: /bekor",
+        parse_mode="HTML",
+    )
+
+
+async def ask_segment(bot: Bot, chat_id: int) -> None:
+    counts = db.segment_counts(datetime.now(TZ).date())
+    rows = [[InlineKeyboardButton(text=f"{label} ({counts[k]})", callback_data=f"bc:seg:{k}")] for k, label in SEGMENTS.items()]
+    rows.append([InlineKeyboardButton(text="❌ Bekor qilish", callback_data="bc:cancel")])
+    await bot.send_message(chat_id, "Kimga yuboriladi?", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@router.message(Command("xabar"))
+async def cmd_xabar(message: Message, command: CommandObject) -> None:
+    user = message.from_user
+    if not user or user.id not in ADMIN_IDS:
+        await message.answer("Bu buyruq faqat adminlar uchun.")
+        return
+    if message.chat.type != "private":
+        await message.answer("E'lonni bot bilan shaxsiy chatda yuboring.")
+        return
+    await start_broadcast(message.bot, message.chat.id, user.id, (command.args or "").strip() if command else "")
+
+
+@router.message(Command("bekor"))
+async def cmd_bekor(message: Message) -> None:
+    user = message.from_user
+    if user and _drafts.pop(user.id, None) is not None:
+        await message.answer("E'lon bekor qilindi.")
+    else:
+        await message.answer("Bekor qiladigan narsa yo'q.")
+
+
+def _awaiting_draft(message: Message) -> bool:
+    """Admin /xabar dan keyin yuborgan birinchi xabar — qoralama. Buyruqlar bunga kirmaydi."""
+    user = message.from_user
+    return bool(
+        user and user.id in ADMIN_IDS
+        and _drafts.get(user.id, {}).get("state") == "await"
+        and not (message.text or "").startswith("/")
+    )
+
+
+@router.message(F.chat.type == "private", _awaiting_draft)
+async def on_draft(message: Message) -> None:
+    uid = message.from_user.id
+    text = (message.text or message.caption or "").strip()
+    kind = "📷 rasm" if message.photo else "🎬 video" if message.video else "📎 fayl" if message.document else "xabar"
+    _drafts[uid] = {"state": "ready", "chat": message.chat.id, "msg": message.message_id, "preview": text[:80] or kind}
+    # Foydalanuvchiga aynan shunday yetib boradi
+    await message.answer("👀 <b>Foydalanuvchi ko'radigan ko'rinish:</b>", parse_mode="HTML")
+    await message.bot.copy_message(
+        message.chat.id, message.chat.id, message.message_id, reply_markup=open_app_keyboard("🕌 Ilovani ochish")
+    )
+    await ask_segment(message.bot, message.chat.id)
+
+
+async def send_copy(bot: Bot, chat_id: int, d: dict) -> str:
+    """Bitta kishiga nusxa. Natija: ok | blocked | failed. Limitga tushsa kutib, bir marta qayta uradi."""
+    for _ in range(2):
+        try:
+            await bot.copy_message(chat_id, d["chat"], d["msg"], reply_markup=open_app_keyboard("🕌 Ilovani ochish"))
+            return "ok"
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+        except TelegramForbiddenError:
+            return "blocked"
+        except TelegramBadRequest as e:
+            if "chat not found" in str(e).lower() or "deactivated" in str(e).lower():
+                return "blocked"
+            logging.warning("E'lon yuborilmadi %s: %s", chat_id, e)
+            return "failed"
+        except Exception as e:  # noqa: BLE001
+            logging.warning("E'lon yuborilmadi %s: %s", chat_id, e)
+            return "failed"
+    return "failed"
+
+
+async def run_broadcast(bot: Bot, admin: int, d: dict, seg: str, ids: list[int], status: Message | None) -> None:
+    """Fonda yuboradi: soniyasiga ~20 ta (Telegram chegarasi 30). Har 25 tada holat xabari yangilanadi."""
+    _broadcast.update(running=True, stop=False)
+    bid = db.add_broadcast(admin, seg, d.get("preview", ""), len(ids))
+    t0 = time.time()
+    sent = blocked = failed = 0
+    try:
+        for i, chat_id in enumerate(ids, 1):
+            if _broadcast["stop"]:
+                break
+            r = await send_copy(bot, chat_id, d)
+            if r == "ok":
+                sent += 1
+            elif r == "blocked":
+                blocked += 1
+                db.set_blocked(chat_id, True)
+                u = USERS.get(str(chat_id))
+                if u:
+                    u["remind"] = False
+            else:
+                failed += 1
+            if status and i % 25 == 0:
+                try:
+                    await status.edit_text(f"📣 Yuborilmoqda… {i} / {len(ids)}", reply_markup=stop_keyboard())
+                except Exception:  # noqa: BLE001
+                    pass
+            await asyncio.sleep(0.05)
+    finally:
+        _broadcast.update(running=False, stop=False)
+        db.finish_broadcast(bid, sent, blocked, failed)
+        save_users(USERS)
+    stopped = sent + blocked + failed < len(ids)
+    head = "⏹ To'xtatildi" if stopped else "✅ Yuborildi"
+    report = (
+        f"{head} — {SEGMENTS.get(seg, seg)}\n\n"
+        f"Yetib bordi: <b>{sent}</b>\nBloklagan: {blocked}\nXato: {failed}\n"
+        f"{int(time.time() - t0)} soniya"
+    )
+    try:
+        if status:
+            await status.edit_text(report, parse_mode="HTML")
+        else:
+            await bot.send_message(admin, report, parse_mode="HTML")
+    except Exception:  # noqa: BLE001
+        await bot.send_message(admin, report, parse_mode="HTML")
+
+
+@router.callback_query(F.data.startswith("bc:"))
+async def cb_broadcast(query: CallbackQuery) -> None:
+    uid = query.from_user.id
+    if uid not in ADMIN_IDS:
+        await query.answer("Ruxsat yo'q")
+        return
+    parts = query.data.split(":")
+    action = parts[1]
+    chat_id = query.message.chat.id if query.message else uid
+    if action == "new":
+        await query.answer()
+        await start_broadcast(query.bot, chat_id, uid)
+        return
+    if action == "stop":
+        _broadcast["stop"] = True
+        await query.answer("To'xtatilmoqda…")
+        return
+    if action == "cancel":
+        _drafts.pop(uid, None)
+        await query.answer("Bekor qilindi")
+        if query.message:
+            await query.message.edit_text("E'lon bekor qilindi.")
+        return
+    d = _drafts.get(uid)
+    if not d or d.get("state") != "ready":
+        await query.answer("Qoralama topilmadi — /xabar dan qayta boshlang")
+        return
+    today = datetime.now(TZ).date()
+    if action == "seg" and len(parts) > 2 and parts[2] in SEGMENTS:
+        seg = parts[2]
+        d["segment"] = seg
+        n = len(db.recipients(seg, today))
+        await query.answer()
+        if query.message:
+            await query.message.edit_text(
+                f"{SEGMENTS[seg]}: <b>{n}</b> kishiga yuboriladi.\n\nBu qaytarib bo'lmaydi. Tasdiqlaysizmi?",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="✅ Ha, yubor", callback_data="bc:go"),
+                    InlineKeyboardButton(text="❌ Bekor", callback_data="bc:cancel"),
+                ]]),
+                parse_mode="HTML",
+            )
+        return
+    if action == "go":
+        if _broadcast["running"]:
+            await query.answer("Boshqa e'lon yuborilmoqda")
+            return
+        seg = d.get("segment") or "hamma"
+        ids = db.recipients(seg, today)
+        _drafts.pop(uid, None)
+        await query.answer("Boshlandi")
+        status = query.message
+        if status:
+            try:
+                await status.edit_text(f"📣 Yuborilmoqda… 0 / {len(ids)}", reply_markup=stop_keyboard())
+            except Exception:  # noqa: BLE001
+                status = None
+        asyncio.create_task(run_broadcast(query.bot, uid, d, seg, ids, status))
+        return
+    await query.answer()
+
+
+@router.callback_query(F.data == "adm:stat")
+async def cb_admin_stat(query: CallbackQuery) -> None:
+    if query.from_user.id not in ADMIN_IDS:
+        await query.answer("Ruxsat yo'q")
+        return
+    await query.answer()
+    if query.message:
+        await query.message.answer(stat_text(), parse_mode="HTML")
+
+
+async def notify_admins(bot: Bot, text: str) -> None:
+    for admin_id in sorted(ADMIN_IDS):
+        try:
+            await bot.send_message(admin_id, text, parse_mode="HTML")
+        except Exception as e:  # noqa: BLE001
+            logging.warning("Adminga xabar yuborilmadi %s: %s", admin_id, e)
+
+
+async def health_check(bot: Bot) -> None:
+    """Ishga tushganda va har kuni: muammo bo'lsa adminga DM. Hammasi joyida bo'lsa — jim."""
+    problems = []
+    if not db.DATA_DIR_PERSISTENT:
+        problems.append("⚠️ <b>Disk vaqtinchalik</b> — baza har deploy'da o'chadi. Railway'da Volume ulang (mount path: /data).")
+    n = db.user_count()
+    prev = None
+    try:
+        prev = int(COUNT_FILE.read_text().strip() or 0)
+    except Exception:  # noqa: BLE001
+        pass
+    if prev is not None and n < prev:
+        problems.append(
+            f"🚨 <b>Foydalanuvchilar soni kamaydi:</b> {prev} → {n}. "
+            "Baza o'chgan yoki almashgan bo'lishi mumkin — /backup nusxasidan tiklang."
+        )
+    try:
+        if prev is None or n >= prev:
+            COUNT_FILE.write_text(str(n))
+    except Exception:  # noqa: BLE001
+        pass
+    if problems:
+        await notify_admins(bot, "\n\n".join(problems))
+
+
 # ---------- materiallar (admin PDF va boshqa fayllarni yuklaydi) ----------
 @router.message(F.document, F.chat.type == "private")
 async def on_admin_document(message: Message) -> None:
@@ -534,6 +835,10 @@ async def send_backup(bot: Bot, chat_id: int) -> bool:
             chat_id, FSInputFile(tmp, filename=f"reyting-{stamp[:10]}.db"),
             caption=f"🗄 Baza zaxirasi — {stamp} · {size // 1024} KB\nTiklash: faylni serverdagi DATA_DIR/reyting.db o'rniga qo'ying.",
         )
+        try:
+            LAST_BACKUP_FILE.write_text(str(int(time.time())))
+        except Exception:  # noqa: BLE001
+            pass
         return True
     except Exception as e:  # noqa: BLE001
         logging.warning("Zaxira yuborilmadi %s: %s", chat_id, e)
@@ -562,13 +867,8 @@ def spark(values: list[int]) -> str:
     return "".join(BLOCKS[min(len(BLOCKS) - 1, v * (len(BLOCKS) - 1) // top)] for v in values)
 
 
-@router.message(Command("stat"))
-async def cmd_stat(message: Message) -> None:
-    """Adminlar uchun: nechta foydalanuvchi bor va qanchasi kunlik faol."""
-    user = message.from_user
-    if not user or user.id not in ADMIN_IDS:
-        await message.answer("Bu buyruq faqat adminlar uchun.")
-        return
+def stat_text() -> str:
+    """Adminlar uchun: nechta foydalanuvchi bor va qanchasi kunlik faol. Faqat yig'indilar."""
     today = datetime.now(TZ).date()
     s = db.stats(today)
     total = s["users"] or 1
@@ -616,7 +916,16 @@ async def cmd_stat(message: Message) -> None:
         f"🎬 Videolar: {s['videos']} · Kitoblar: {s['files']}",
         f"🗄 Baza: {s['db_kb']} KB · {disk}",
     ]
-    await message.answer("\n".join(lines), parse_mode="HTML")
+    return "\n".join(lines)
+
+
+@router.message(Command("stat"))
+async def cmd_stat(message: Message) -> None:
+    user = message.from_user
+    if not user or user.id not in ADMIN_IDS:
+        await message.answer("Bu buyruq faqat adminlar uchun.")
+        return
+    await message.answer(stat_text(), parse_mode="HTML")
 
 
 @router.message(Command("backup"))
@@ -741,7 +1050,7 @@ async def send_reminders(bot: Bot, kind: str) -> None:
             f"Bugungi zikr: <b>{title}</b>\n<i>{tip}</i>\n\n"
             "5 daqiqa ajrating — bugungi vazifani yakunlang ✅"
         )
-    sent = 0
+    sent = failed = 0
     for chat_id, u in list(USERS.items()):
         if not u.get("remind"):
             continue
@@ -749,12 +1058,26 @@ async def send_reminders(bot: Bot, kind: str) -> None:
             await bot.send_message(int(chat_id), text, reply_markup=open_app_keyboard(), parse_mode="HTML")
             sent += 1
             await asyncio.sleep(0.05)  # Telegram limitiga rioya
-        except Exception as e:  # noqa: BLE001
-            logging.warning("Eslatma yuborilmadi %s: %s", chat_id, e)
-            if "blocked" in str(e).lower() or "chat not found" in str(e).lower():
+        except TelegramRetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
+            failed += 1
+        except (TelegramForbiddenError, TelegramBadRequest) as e:
+            # Bloklagan yoki chat yo'q — boshqa urinmaymiz, e'lonlarga ham kirmaydi
+            if isinstance(e, TelegramForbiddenError) or "chat not found" in str(e).lower():
                 u["remind"] = False
+                db.set_blocked(int(chat_id), True)
+            else:
+                failed += 1
+                logging.warning("Eslatma yuborilmadi %s: %s", chat_id, e)
+        except Exception as e:  # noqa: BLE001
+            failed += 1
+            logging.warning("Eslatma yuborilmadi %s: %s", chat_id, e)
     save_users(USERS)
-    logging.info("%s eslatmasi %d kishiga yuborildi", kind, sent)
+    logging.info("%s eslatmasi %d kishiga yuborildi, %d xato", kind, sent, failed)
+    if failed >= 5 and failed * 5 >= sent + failed:  # 20% dan ko'pi yetmadi — tarmoq yoki Telegram muammosi
+        await notify_admins(
+            bot, f"⚠️ <b>{kind} eslatmasi:</b> {failed} ta yuborilmadi, {sent} ta yetdi. Server yoki Telegram bilan muammo bo'lishi mumkin."
+        )
 
 
 
@@ -793,7 +1116,7 @@ async def main() -> None:
     me = await bot.get_me()
     BOT_USERNAME = me.username or ""
     await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(text="Ilova", web_app=WebAppInfo(url=WEBAPP_URL)))
-    await bot.set_my_commands([
+    commands = [
         BotCommand(command="start", description="Boshlash"),
         BotCommand(command="app", description="Ilovani ochish"),
         BotCommand(command="reyting", description="Haftalik Nur natijam"),
@@ -801,9 +1124,21 @@ async def main() -> None:
         BotCommand(command="vaqt", description="Bomdod vaqti"),
         BotCommand(command="eslatma", description="Zikr eslatmalari"),
         BotCommand(command="id", description="Telegram ID im"),
-        BotCommand(command="stat", description="Statistika (admin)"),
         BotCommand(command="help", description="Yordam"),
-    ])
+    ]
+    await bot.set_my_commands(commands)
+    # Admin buyruqlari faqat adminlarning chatida ko'rinadi (boshqalarga ro'yxat toza qoladi)
+    admin_commands = commands + [
+        BotCommand(command="admin", description="Admin paneli"),
+        BotCommand(command="xabar", description="E'lon yuborish"),
+        BotCommand(command="stat", description="Statistika"),
+        BotCommand(command="backup", description="Baza nusxasi"),
+    ]
+    for admin_id in sorted(ADMIN_IDS):
+        try:
+            await bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        except Exception as e:  # noqa: BLE001
+            logging.warning("Admin buyruqlari o'rnatilmadi %s: %s", admin_id, e)  # admin botni hali ochmagan
 
     # Reyting API — Mini App shu yerga murojaat qiladi (webapp/data.js → apiUrl). Bot bilan bir jarayonda.
     runner = web.AppRunner(api.create_app(BOT_TOKEN, BOT_USERNAME, WEBAPP_URL, TZ, ADMIN_IDS))
@@ -816,12 +1151,14 @@ async def main() -> None:
     scheduler.add_job(send_weekly, CronTrigger(day_of_week="sun", hour=WEEKLY_HOUR, minute=0), args=[bot])
     if BACKUP_DAY and ADMIN_IDS:
         scheduler.add_job(weekly_backup, CronTrigger(day_of_week=BACKUP_DAY, hour=3, minute=0), args=[bot])
+    scheduler.add_job(health_check, CronTrigger(hour=4, minute=10), args=[bot])
     scheduler.start()
 
     logging.info(
         "Bot @%s ishga tushdi. WebApp: %s | API port: %d | ma'lumotlar: %s | eslatmalar: %02d:00 va %02d:00 | haftalik xulosa: yak %02d:00",
         BOT_USERNAME, WEBAPP_URL, API_PORT, db.DATA_DIR, MORNING_HOUR, EVENING_HOUR, WEEKLY_HOUR,
     )
+    await health_check(bot)  # disk vaqtinchalik yoki foydalanuvchilar kamaygan bo'lsa — adminga DM
     try:
         await dp.start_polling(bot)
     finally:

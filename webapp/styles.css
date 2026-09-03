@@ -520,3 +520,17 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .hero-city.gps { background: rgba(124,255,196,.18); border-color: rgba(124,255,196,.35); }
 
 /* keyingi namoz — 6 ta vaqt qatorida ajratib ko'rsatiladi */
+
+/* ---------- admin sahifasi ---------- */
+.admin-hero { background: linear-gradient(135deg, #1F4E8C 0%, #0E2A4F 100%); }
+.admin-ic { width: 60px; height: 60px; border-radius: 18px; background: rgba(255,255,255,.14); display: grid; place-items: center; flex-shrink: 0; }
+.admin-card { cursor: pointer; }
+.admin-card:active { transform: scale(.985); }
+.kv { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; }
+.kv:last-child { border-bottom: 0; }
+.kv span { color: var(--ink-2); }
+.kv b { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.bars.dense { gap: 2px; height: 96px; margin-top: 6px; }
+.bars.dense .bar-col { padding: 0; gap: 0; border-radius: 3px; }
+.bars-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-weight: 700; margin-top: 6px; }
+.admin-actions { margin-top: 4px; }

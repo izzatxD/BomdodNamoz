@@ -13,8 +13,8 @@ window.App = (function () {
     suraKind: "suralar", tab: "home", arabicSize: 30,
   };
   const tabRenderers = {};          // modullar ro'yxatga oladi: App.onTab("zikr", fn)
-  const titles = { home: "Bomdod namozi", namoz: "Qadam-baqadam", qazo: "Qazo namozlar", zikr: "Zikrlar", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting" };
-  const navFor = { qazo: "namoz", video: "home" }; // pastki menyuda qaysi tugma yonadi
+  const titles = { home: "Bomdod namozi", namoz: "Qadam-baqadam", qazo: "Qazo namozlar", zikr: "Zikrlar", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting", admin: "Admin" };
+  const navFor = { qazo: "namoz", video: "home", admin: "home" }; // pastki menyuda qaysi tugma yonadi
 
   function haptic(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(type || "light"); } catch (e) {} }
   function notify(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(type || "success"); } catch (e) {} }
@@ -144,6 +144,7 @@ window.App = (function () {
     }
     $$("#today-card [data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
     if (window.Reyting) Reyting.renderHome();
+    if (window.Admin) Admin.renderHome();   // faqat adminga ko'rinadigan kartochka
   }
 
   // ---------- namoz vaqti ----------

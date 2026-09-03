@@ -5,6 +5,7 @@ Mini App uchun HTTP API — bot bilan BIR jarayonda (aiohttp) ishlaydi, alohida 
   POST /api/sync    — { name, anon, total, days: [{ d, zikr, tasbih, qazo, ilm, odat }] }
                       har kategoriya CAPS bilan chegaralanib qo'shiladi, faqat kunlik JAMI saqlanadi
   GET  /api/board?scope=liga|team|friends[&team=CHAT_ID]
+  GET  /api/admin/stats — admin sahifasi (faqat ADMIN_IDS; faqat yig'indilar)
 
 XAVFSIZLIK: har so'rovda X-Init-Data sarlavhasi (Telegram initData) bo'lishi shart —
 bot tokeni bilan HMAC-SHA256 orqali tekshiriladi; 24 soatdan eski initData rad etiladi.
@@ -483,6 +484,30 @@ async def admin_lookup(request: web.Request) -> web.Response:
     return web.json_response(out)
 
 
+async def admin_stats(request: web.Request) -> web.Response:
+    """
+    Admin sahifasi. MAXFIYLIK: faqat yig'indilar — bitta foydalanuvchining ma'lumoti chiqmaydi.
+    Eslatma yoqqanlar soni bot/users.json dan (bot.py yuritadi), oxirgi zaxira vaqti .last_backup dan.
+    """
+    if not _is_admin(request):
+        return web.json_response({"error": "forbidden"}, status=403)
+    cfg = request.app["cfg"]
+    out = db.admin_stats(_today(cfg["tz"]), cfg["tz"])
+    reminders = 0
+    try:
+        data = json.loads((db.DATA_DIR / "users.json").read_text("utf-8"))
+        reminders = sum(1 for u in data.values() if isinstance(u, dict) and u.get("remind"))
+    except Exception:  # noqa: BLE001
+        pass
+    last_backup = 0
+    try:
+        last_backup = int((db.DATA_DIR / ".last_backup").read_text().strip() or 0)
+    except Exception:  # noqa: BLE001
+        pass
+    out.update({"ok": True, "reminders": reminders, "last_backup": last_backup, "now": int(time.time()), "bot": cfg["bot"]})
+    return web.json_response(out)
+
+
 def create_app(bot_token: str, bot_username: str, webapp_url: str, tz: ZoneInfo, admins: set[int] | None = None) -> web.Application:
     """CORS faqat Mini App joylashgan origin uchun ochiladi (WEBAPP_URL dan olinadi)."""
     origin = "*"
@@ -500,4 +525,5 @@ def create_app(bot_token: str, bot_username: str, webapp_url: str, tz: ZoneInfo,
     app.router.add_post("/api/admin/video/move", admin_video_move)
     app.router.add_post("/api/admin/file/delete", admin_file_delete)
     app.router.add_post("/api/admin/lookup", admin_lookup)
+    app.router.add_get("/api/admin/stats", admin_stats)
     return app

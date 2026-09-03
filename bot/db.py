@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 import sqlite3
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 # Ma'lumotlar papkasi. Tartib:
@@ -101,12 +101,25 @@ CREATE TABLE IF NOT EXISTS files (
   created  INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS files_section ON files(section, ord);
+CREATE TABLE IF NOT EXISTS broadcasts (
+  id       INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin    INTEGER NOT NULL DEFAULT 0,
+  segment  TEXT    NOT NULL DEFAULT 'hamma',     -- hamma | faol | uxlagan
+  preview  TEXT    NOT NULL DEFAULT '',          -- matnning boshi (80 belgi)
+  total    INTEGER NOT NULL DEFAULT 0,           -- nechta kishiga mo'ljallangan
+  sent     INTEGER NOT NULL DEFAULT 0,
+  blocked  INTEGER NOT NULL DEFAULT 0,
+  failed   INTEGER NOT NULL DEFAULT 0,
+  created  INTEGER NOT NULL DEFAULT 0,
+  finished INTEGER NOT NULL DEFAULT 0
+);
 """
 
 # Keyingi versiyalarda qo'shilgan ustunlar — mavjud bazani buzmasdan qo'shiladi
 MIGRATIONS = [
     ("videos", "playlist", "TEXT NOT NULL DEFAULT ''"),  # YouTube playlist ID (bo'sh bo'lsa — oddiy video)
     ("users", "total", "INTEGER NOT NULL DEFAULT 0"),     # keshlangan jami Nur (all_totals() endi jadvalni qo'shib chiqmaydi)
+    ("users", "blocked", "INTEGER NOT NULL DEFAULT 0"),   # botni bloklagan — eslatma va e'lon yuborilmaydi
 ]
 
 _conn: sqlite3.Connection | None = None
@@ -223,6 +236,112 @@ def data_since() -> int:
         return now
     except Exception:  # noqa: BLE001
         return 0
+
+
+# ---------- e'lonlar (admin) va bloklaganlar ----------
+def set_blocked(uid: int, flag: bool) -> None:
+    """Foydalanuvchi botni bloklagan (yoki qaytib keldi). Bloklaganlarga hech narsa yuborilmaydi."""
+    c = conn()
+    c.execute("UPDATE users SET blocked=? WHERE id=?", (1 if flag else 0, uid))
+    c.commit()
+
+
+def recipients(segment: str, today: date) -> list[int]:
+    """
+    E'lon oluvchilar. Bloklaganlar hech qachon kirmaydi.
+      hamma   — ro'yxatdagi hamma
+      faol    — shu hafta Nur to'plaganlar
+      uxlagan — 14 kundan beri hech narsa qilmaganlar (kamida 14 kun oldin qo'shilgan)
+    """
+    c = conn()
+    if segment == "faol":
+        mon, sun = week_range(today)
+        rows = c.execute(
+            "SELECT DISTINCT d.user_id AS id FROM daily d JOIN users u ON u.id = d.user_id "
+            "WHERE d.day BETWEEN ? AND ? AND d.nur > 0 AND u.blocked = 0",
+            (mon, sun),
+        ).fetchall()
+    elif segment == "uxlagan":
+        rows = c.execute(
+            "SELECT id FROM users WHERE blocked = 0 AND id > 0 AND created < ? "
+            "AND id NOT IN (SELECT DISTINCT user_id FROM daily WHERE day >= ? AND nur > 0)",
+            (int(time.time()) - 14 * 86400, (today - timedelta(days=14)).isoformat()),
+        ).fetchall()
+    else:
+        rows = c.execute("SELECT id FROM users WHERE blocked = 0 AND id > 0").fetchall()
+    return [int(r["id"]) for r in rows]
+
+
+def segment_counts(today: date) -> dict[str, int]:
+    return {seg: len(recipients(seg, today)) for seg in ("hamma", "faol", "uxlagan")}
+
+
+def add_broadcast(admin: int, segment: str, preview: str, total: int) -> int:
+    c = conn()
+    cur = c.execute(
+        "INSERT INTO broadcasts (admin, segment, preview, total, created) VALUES (?,?,?,?,?)",
+        (admin, segment, preview[:80], total, int(time.time())),
+    )
+    c.commit()
+    return int(cur.lastrowid)
+
+
+def finish_broadcast(bid: int, sent: int, blocked: int, failed: int) -> None:
+    c = conn()
+    c.execute(
+        "UPDATE broadcasts SET sent=?, blocked=?, failed=?, finished=? WHERE id=?",
+        (sent, blocked, failed, int(time.time()), bid),
+    )
+    c.commit()
+
+
+def last_broadcast() -> dict | None:
+    r = conn().execute("SELECT * FROM broadcasts ORDER BY id DESC LIMIT 1").fetchone()
+    return {k: r[k] for k in r.keys()} if r is not None else None
+
+
+def admin_stats(today: date, tz, days: int = 30) -> dict:
+    """
+    Admin sahifasi uchun: stats() + oxirgi N kunlik qatorlar + darajalar taqsimoti.
+    MAXFIYLIK: faqat yig'indilar — bitta foydalanuvchining ma'lumoti chiqmaydi.
+    """
+    c = conn()
+    start = today - timedelta(days=days - 1)
+    rows = c.execute(
+        "SELECT day, COUNT(DISTINCT user_id) AS n, COALESCE(SUM(nur), 0) AS nur FROM daily "
+        "WHERE day BETWEEN ? AND ? AND nur > 0 GROUP BY day",
+        (start.isoformat(), today.isoformat()),
+    ).fetchall()
+    by_day = {r["day"]: (int(r["n"]), int(r["nur"])) for r in rows}
+
+    # Yangi qo'shilganlar — mahalliy kun bo'yicha
+    new_by_day: dict[str, int] = {}
+    since_ts = int(datetime.combine(start, datetime.min.time(), tzinfo=tz).timestamp())
+    for r in c.execute("SELECT created FROM users WHERE created >= ?", (since_ts,)).fetchall():
+        k = datetime.fromtimestamp(int(r["created"]), tz).date().isoformat()
+        new_by_day[k] = new_by_day.get(k, 0) + 1
+
+    series = []
+    for i in range(days):
+        d = (start + timedelta(days=i)).isoformat()
+        n, nur = by_day.get(d, (0, 0))
+        series.append({"d": d, "dau": n, "nur": nur, "new": new_by_day.get(d, 0)})
+
+    levels = [0] * len(LEVELS)
+    for r in c.execute("SELECT total FROM users").fetchall():
+        levels[level_index(int(r["total"]))] += 1
+
+    out = stats(today)
+    out.pop("chart", None)  # date obyektlari — JSON ga chiqmaydi; o'rniga series bor
+    out.update({
+        "series": series,
+        "levels": [{"name": LEVELS[i][0], "n": levels[i]} for i in range(len(LEVELS))],
+        "blocked": int((c.execute("SELECT COUNT(*) FROM users WHERE blocked = 1").fetchone() or [0])[0] or 0),
+        "since": data_since(),
+        "persistent": DATA_DIR_PERSISTENT,
+        "last_broadcast": last_broadcast(),
+    })
+    return out
 
 
 def user_count() -> int:
