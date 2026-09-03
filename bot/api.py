@@ -250,11 +250,14 @@ async def ping(request: web.Request) -> web.Response:
         users = db.user_count()
     except Exception:  # noqa: BLE001
         users = -1
+    since = db.data_since()
     return web.json_response({
         "ok": True,
         "time": int(time.time()),
         "storage": "doimiy" if db.DATA_DIR_PERSISTENT else "vaqtinchalik",
         "users": users,
+        "since": since,                               # deploy'dan keyin O'ZGARMASLIGI kerak
+        "age_min": int((time.time() - since) / 60) if since else 0,
     })
 
 

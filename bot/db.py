@@ -210,6 +210,21 @@ def upsert_days(uid: int, rows: list[tuple[str, int]]) -> None:
     c.commit()
 
 
+def data_since() -> int:
+    """Ma'lumot papkasi BIRINCHI marta yozilgan vaqt (unix). Deploy'dan keyin ham
+    o'zgarmasa — disk haqiqatan doimiy. Volume ulanmagan bo'lsa har deploy'da
+    yangi qiymat chiqadi, chunki konteyner bilan birga fayl ham o'chadi."""
+    f = DATA_DIR / ".since"
+    try:
+        if f.exists():
+            return int((f.read_text().strip() or "0"))
+        now = int(time.time())
+        f.write_text(str(now))
+        return now
+    except Exception:  # noqa: BLE001
+        return 0
+
+
 def user_count() -> int:
     """Ro'yxatdagi foydalanuvchilar soni. /api/ping shu bilan bazaning tirikligini ko'rsatadi."""
     c = conn()
