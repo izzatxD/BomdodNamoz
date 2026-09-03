@@ -46,9 +46,24 @@ import api  # noqa: E402
 import db  # noqa: E402
 import vaqt  # noqa: E402
 
-BOT_TOKEN = os.getenv("BOT_TOKEN", "")
+def env_str(name: str, default: str = "") -> str:
+    """Muhit o'zgaruvchisi. Ba'zi panellar qiymatni tirnoq bilan uzatadi — ularni olib tashlaymiz."""
+    return os.getenv(name, "").strip().strip("\"'").strip() or default
+
+
+def env_ids(name: str) -> set[int]:
+    """Vergul bilan ajratilgan Telegram ID lar. Tirnoq, bo'shliq va bo'sh qiymatlarga chidamli."""
+    out: set[int] = set()
+    for part in os.getenv(name, "").replace(";", ",").split(","):
+        cleaned = part.strip().strip("\"'").strip()
+        if cleaned.isdigit():
+            out.add(int(cleaned))
+    return out
+
+
+BOT_TOKEN = env_str("BOT_TOKEN")
 # Mini App manzili. Ko'rsatilmasa — shu repozitoriyning GitHub Pages manzili.
-WEBAPP_URL = os.getenv("WEBAPP_URL", "").strip() or "https://izzatxd.github.io/BomdodNamoz/"
+WEBAPP_URL = env_str("WEBAPP_URL", "https://izzatxd.github.io/BomdodNamoz/")
 TZ = ZoneInfo(os.getenv("TZ", "Asia/Tashkent"))
 MORNING_HOUR = int(os.getenv("MORNING_HOUR", "6"))    # tong zikri eslatmasi (soat)
 EVENING_HOUR = int(os.getenv("EVENING_HOUR", "18"))   # tun zikri eslatmasi (soat)
@@ -57,9 +72,9 @@ API_PORT = int(os.getenv("PORT") or os.getenv("API_PORT") or "8080")  # Mini App
 WEEKLY_HOUR = int(os.getenv("WEEKLY_HOUR", "20"))  # yakshanba kuni haftalik reyting xulosasi (soat)
 # Super adminlar — ilovadagi Video bo'limida «Video qo'shish» paneli faqat shularga ko'rinadi.
 # Telegram ID ni bilish uchun botga /id yozing.
-ADMIN_IDS = {int(x) for x in os.getenv("ADMIN_IDS", "").replace(" ", "").split(",") if x.strip().isdigit()}
+ADMIN_IDS = env_ids("ADMIN_IDS")
 BOT_USERNAME = ""  # main() da to'ldiriladi
-BACKUP_DAY = os.getenv("BACKUP_DAY", "mon")  # haftalik baza zaxirasi adminga yuboriladigan kun (mon..sun, "" — o'chiq)
+BACKUP_DAY = env_str("BACKUP_DAY", "mon")  # haftalik baza zaxirasi adminga yuboriladigan kun (mon..sun, "" — o'chiq)
 
 if not BOT_TOKEN:
     raise SystemExit(
