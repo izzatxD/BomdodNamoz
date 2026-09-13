@@ -4,7 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Bomdod namozi</title>
+  <!-- Shrift FAYLLARI gstatic'dan keladi — ulanishni oldindan ochamiz, aks holda
+       birinchi ochilishda qo'shimcha TLS qo'l berishi matnni kechiktiradi -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -54,6 +57,8 @@
           <div class="hero-count-val" id="countdown"><span class="skeleton w160"></span></div>
         </div>
         <div class="hero-all" id="times-all"></div>
+        <!-- «Hozir nima qilay?» — vaqtga va bugun bajarilganiga qarab (app.js → nextAction) -->
+        <button class="hero-action hidden" id="hero-action"></button>
       </div>
 
       <div class="card today-card" id="today-card"></div>
@@ -94,6 +99,10 @@
       </div>
       <div class="card" id="namoz-after"></div>
       <button class="menu-item" data-go="qazo"><span class="menu-icon t-rose"><i data-icon="calendar"></i></span><span class="menu-text"><b>Qazo namozlar</b><small>O'tkazib yuborilgan namozlar hisobi</small></span><i data-icon="chevron" class="menu-arrow"></i></button>
+      <!-- Qadam-baqadam ko'rsatma faqat bomdod uchun. Qolgan namozlar video darslarda —
+           foydalanuvchi bu yerda ular yo'q deb o'ylab qolmasin (app.js → renderOtherPrayers). -->
+      <div class="section-head"><h2 class="section-title">Boshqa namozlar</h2></div>
+      <div class="list" id="namoz-others"></div>
     </section>
 
     <!-- ================= QAZO ================= -->
@@ -140,6 +149,9 @@
       <div id="zikr-body"></div>
     </section>
 
+    <!-- ================= TA'LIM (arab tili, suralar, video darslarga kirish) ================= -->
+    <section id="tab-talim" class="screen tab"><div id="talim-body"></div></section>
+
     <!-- ================= ARAB TILI ================= -->
     <section id="tab-arab" class="screen tab"><div id="arab-body"></div></section>
 
@@ -170,14 +182,15 @@
       <div id="detail-body"></div>
     </section>
 
-    <!-- ================= Pastki navigatsiya ================= -->
+    <!-- ================= Pastki navigatsiya =================
+         5 ta asosiy manzil. Qolgan ekranlar shularning ichida yashaydi:
+         Qazo → Namoz;  Arab tili, Suralar, Video → Ta'lim  (app.js dagi navParent). -->
     <nav class="bottombar">
       <button class="nav active" data-tab="home"><i data-icon="home"></i><span>Bosh</span></button>
       <button class="nav" data-tab="namoz"><i data-icon="mosque"></i><span>Namoz</span></button>
       <button class="nav" data-tab="zikr"><i data-icon="beads"></i><span>Zikr</span></button>
+      <button class="nav" data-tab="talim"><i data-icon="book"></i><span>Ta'lim</span></button>
       <button class="nav" data-tab="reyting"><i data-icon="trophy"></i><span>Reyting</span></button>
-      <button class="nav" data-tab="arab"><i data-icon="letters"></i><span>Arab tili</span></button>
-      <button class="nav" data-tab="suralar"><i data-icon="book"></i><span>Suralar</span></button>
     </nav>
   </div>
 

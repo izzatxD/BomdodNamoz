@@ -94,6 +94,11 @@ window.Video = (function () {
     return list.filter((v) => !v.gender || v.gender === "hamma" || v.gender === g);
   }
   function inSection(id) { return visible(all()).filter((v) => (v.section || "boshqa") === id); }
+  // Qisqa holat — Ta'lim bo'limidagi kartochka shuni ko'rsatadi
+  function summary() {
+    const list = visible(all());
+    return { total: list.length, done: list.filter(isDone).length };
+  }
   function filesIn(id) { return files().filter((f) => (f.section || "boshqa") === id); }
 
   async function load() {
@@ -474,7 +479,15 @@ window.Video = (function () {
   }
 
   // Pleyer yopilganda ro'yxatni yangilaymiz — ko'rilgan foiz va yangi ochilgan dars ko'rinsin
+  // Boshqa bo'limlardan to'g'ridan-to'g'ri kerakli bo'limni ochish (masalan Namoz → peshin darslari)
+  function open(id) {
+    section = SECTIONS.some((s) => s.id === id) ? id : null;
+    App.showTab("video");
+  }
+  // Bo'limdagi ko'rinadigan darslar soni — chaqiruvchi «bo'sh» yoki «N ta dars» deb yozishi uchun
+  function countIn(id) { return inSection(id).length; }
+
   App.onTab("video", () => { render(); load(); });
   Api.onSync(() => { if (App.state.tab === "video") render(); });
-  return { render, parseYouTube, parsePlaylist, load };
+  return { render, summary, open, countIn, parseYouTube, parsePlaylist, load };
 })();

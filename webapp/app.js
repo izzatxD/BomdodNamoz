@@ -13,8 +13,11 @@ window.App = (function () {
     suraKind: "suralar", tab: "home", arabicSize: 30,
   };
   const tabRenderers = {};          // modullar ro'yxatga oladi: App.onTab("zikr", fn)
-  const titles = { home: "Bomdod namozi", namoz: "Qadam-baqadam", qazo: "Qazo namozlar", zikr: "Zikrlar", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting", admin: "Admin" };
-  const navFor = { qazo: "namoz", video: "home", admin: "home" }; // pastki menyuda qaysi tugma yonadi
+  const titles = { home: "Bomdod namozi", namoz: "Bomdod — qadamlar", qazo: "Qazo namozlar", zikr: "Zikrlar", talim: "Ta'lim", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting", admin: "Admin" };
+  // Pastki menyuda 5 ta manzil bor; qolgan ekranlar shularning ICHIDA yashaydi.
+  // Bu yerda "qaysi tugma yonsin" emas, ekranning OTASI yoziladi — shuning uchun
+  // orqaga qaytish ham, yonib turgan tugma ham foydalanuvchi kutgandek chiqadi.
+  const navParent = { qazo: "namoz", arab: "talim", suralar: "talim", video: "talim", admin: "home" };
 
   function haptic(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(type || "light"); } catch (e) {} }
   function notify(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(type || "success"); } catch (e) {} }
@@ -35,8 +38,9 @@ window.App = (function () {
     tg.ready(); tg.expand();
     tg.onEvent("themeChanged", applyTheme);
     tg.BackButton.onClick(() => {
+      // Orqaga — bir pog'ona yuqoriga: arab → ta'lim → bosh (navParent bo'yicha)
       if ($("#screen-detail").classList.contains("active")) closeDetail();
-      else if (state.tab !== "home") showTab("home");
+      else if (state.tab !== "home") showTab(navParent[state.tab] || "home");
     });
   }
 
@@ -116,7 +120,7 @@ window.App = (function () {
   function showTab(name) {
     state.tab = name;
     $$(".tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + name));
-    const navName = navFor[name] || name;
+    const navName = navParent[name] || name;
     $$(".nav").forEach((b) => b.classList.toggle("active", b.dataset.tab === navName));
     $("#topbar-title").textContent = titles[name] || "Bomdod namozi";
     if (tabRenderers[name]) tabRenderers[name]();
@@ -125,6 +129,30 @@ window.App = (function () {
     if (tg) name === "home" ? tg.BackButton.hide() : tg.BackButton.show();
   }
   function onTab(name, fn) { tabRenderers[name] = fn; }
+
+  // ---------- Ta'lim (arab tili, suralar, video darslar) ----------
+  // Uchala o'quv bo'limi bitta eshikda. Har birida hozirgi holat ko'rinadi —
+  // «qayerda to'xtagan edim?» degan savolga javob ichkariga kirmasdan ko'rinsin.
+  function renderTalim() {
+    const arab = window.Arabic ? Arabic.summary() : null;
+    const video = window.Video ? Video.summary() : null;
+    const items = [
+      { tab: "arab", icon: "letters", tone: "t-blue", title: "Arab tili",
+        sub: arab ? `${arab.done}/${arab.total} dars tugatildi` : "Alifbodan Qur'on o'qishgacha" },
+      { tab: "suralar", icon: "book", tone: "t-teal", title: "Suralar va duolar",
+        sub: `${D.suralar.length} ta sura · ${D.zikrlar.length} ta namoz duosi` },
+      { tab: "video", icon: "video", tone: "t-purple", title: "Video darslar",
+        sub: video && video.total ? `${video.total} ta dars · ${video.done} tasi ko'rildi` : "Darslar tayyorlanmoqda" },
+    ];
+    $("#talim-body").innerHTML = `<div class="list">${items.map((it) => `
+      <button class="menu-item" data-go="${it.tab}">
+        <span class="menu-icon ${it.tone}">${Icons.get(it.icon)}</span>
+        <span class="menu-text"><b>${esc(it.title)}</b><small>${esc(it.sub)}</small></span>
+        <span class="menu-arrow">${Icons.get("chevron")}</span>
+      </button>`).join("")}</div>`;
+    $$("#talim-body [data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
+  }
+  tabRenderers.talim = renderTalim;
 
   // ---------- bugungi kartochka (bosh sahifa) ----------
   function renderToday() {
@@ -143,6 +171,9 @@ window.App = (function () {
         <button class="menu-arrow" data-go="zikr">${Icons.get("chevron")}</button>`;
     }
     $$("#today-card [data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
+    // Zikr bajarilgandan keyin bosh sahifaga qaytilganda taklif darhol yangilansin
+    // (sanoq ham bir soniyada yangilaydi, lekin o'shanda ko'z oldida almashib ketadi)
+    if (lastTimes) { const n = new Date(); renderHeroAction(prayerState(lastTimes, n.getHours() * 60 + n.getMinutes())); }
     if (window.Reyting) Reyting.renderHome();
     if (window.Admin) Admin.renderHome();   // faqat adminga ko'rinadigan kartochka
   }
@@ -192,6 +223,42 @@ window.App = (function () {
   function renderHero(s, secLeft) {
     $("#next-label").textContent = s.now === "bomdod" ? "Quyosh chiqishigacha" : `${NAMES[s.next]}gacha`;
     $("#countdown").textContent = fmtClock(secLeft);
+  }
+
+  // ---------- «Hozir nima qilay?» ----------
+  // Bosh sahifada bitta asosiy harakat bo'lsin — ilova ochilganda foydalanuvchi
+  // ro'yxatlarni kezib chiqmasin. Vaqt oynalari:
+  //   bomdod → quyosh : namoz vaqti
+  //   quyosh → shom   : tongi zikr
+  //   shom   → bomdod : tungi zikr
+  // Bugun bajarilgan ish qayta taklif qilinmaydi; hammasi tugagan bo'lsa — tinch tasdiq.
+  function nextAction(s) {
+    const z = window.Zikr ? Zikr.summary() : { started: false };
+    if (!z.started) return null;                 // dastur boshlanmagan — bu taklifni "Bugungi" kartochkasi qiladi
+    const left = (type) => z.tasks.some((t) => t.type === type && !t.done);
+    if (s.now === "bomdod") return { key: "namoz", label: "Bomdod namozini o'qish", icon: "mosque", run: () => showTab("namoz") };
+    if (left("tong") && (s.next === "peshin" || s.now === "peshin" || s.now === "asr"))
+      return { key: "tong", label: "Tongi zikrlarni o'qish", icon: "sunrise", run: () => Zikr.open("tong") };
+    if (left("tun") && (s.now === "shom" || s.now === "xufton"))
+      return { key: "tun", label: "Tungi zikrlarni o'qish", icon: "moon", run: () => Zikr.open("tun") };
+    if (left("tasbih")) return { key: "tasbih", label: "Tasbihni yakunlash", icon: "beads", run: () => Zikr.open("tasbih") };
+    if (z.tasks.length && z.tasks.every((t) => t.done))
+      return { key: "done", label: "Bugungi vazifalar bajarildi", icon: "check", done: true, run: () => Zikr.open("odat") };
+    return null;
+  }
+  let lastActionKey = "";
+  // Sanoq har soniyada yuradi — tugma faqat taklif O'ZGARGANDA qayta chiziladi
+  function renderHeroAction(s) {
+    const el = $("#hero-action");
+    if (!el) return;
+    const a = nextAction(s), key = a ? a.key : "";
+    if (key === lastActionKey) return;
+    lastActionKey = key;
+    el.classList.toggle("hidden", !a);
+    el.classList.toggle("done", !!(a && a.done));
+    if (!a) return;
+    el.innerHTML = `${Icons.get(a.icon, 18)} ${esc(a.label)}`;
+    el.onclick = () => { haptic("medium"); a.run(); };
   }
 
   // Hero'dagi 6 ta vaqt; hozir davom etayotgan namoz vaqti ajratib ko'rsatiladi
@@ -268,6 +335,7 @@ window.App = (function () {
       if (left < 0) left += 24 * 3600;                          // ertangi bomdod
       renderHero(s, left);
       renderAllTimes(lastTimes, s);
+      renderHeroAction(s);
       const el = $("#hero-count-box") || $("#countdown").parentElement;
       el.classList.toggle("live", !!s.now);                     // namoz vaqti davom etyapti
       el.classList.toggle("soon", left <= 15 * 60);             // 15 daqiqadan kam qoldi
@@ -287,7 +355,28 @@ window.App = (function () {
     $$("#rakat-seg .seg").forEach((b) => b.classList.toggle("active", b.dataset.rakat === state.rakat));
     $("#niyat-text").textContent = state.rakat === "sunnat" ? D.namoz.sunnatNiyat : D.namoz.farzNiyat;
     $("#namoz-after").innerHTML = `<div class="card-label">Namozdan so'ng</div><p>${D.namoz.after}</p>`;
+    renderOtherPrayers();
     renderStep();
+  }
+
+  // Qadam-baqadam ko'rsatma bomdod uchun yozilgan. Qolgan namozlar video darslarda —
+  // shuning uchun ularga shu yerdan yo'l ochamiz, aks holda «ilovada yo'q» degan taassurot qoladi.
+  const OTHER_PRAYERS = ["peshin", "asr", "shom", "xufton", "juma"];
+  function renderOtherPrayers() {
+    const el = $("#namoz-others");
+    if (!el) return;
+    const rows = OTHER_PRAYERS
+      .map((id) => (D.videoSections || []).find((s) => s.id === id))
+      .filter(Boolean)
+      .map((s) => {
+        const n = window.Video ? Video.countIn(s.id) : 0;
+        return `<button class="menu-item" data-sec="${s.id}">
+          <span class="menu-icon t-green">${Icons.get(s.icon || "mosque")}</span>
+          <span class="menu-text"><b>${esc(s.title)}</b><small>${n ? n + " ta video dars" : "Darslar tayyorlanmoqda"}</small></span>
+          <span class="menu-arrow">${Icons.get("chevron")}</span></button>`;
+      });
+    el.innerHTML = rows.join("");
+    $$("#namoz-others [data-sec]").forEach((b) => b.addEventListener("click", () => { haptic(); if (window.Video) Video.open(b.dataset.sec); }));
   }
   function renderStep() {
     const steps = D.namoz.steps, i = state.step, s = steps[i], g = state.gender || "erkak", note = s[g];

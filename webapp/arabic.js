@@ -12,9 +12,15 @@ window.Arabic = (function () {
   }
   function letter(n) { return A.letters[n - 1]; }
 
+  // Qisqa holat — Ta'lim bo'limidagi kartochka shuni ko'rsatadi
+  function summary() {
+    const p = progress();
+    return { total: A.lessons.length, done: A.lessons.filter((l) => (p[l.id] || 0) >= 80).length };
+  }
+
   // ---------- darslar ro'yxati ----------
   function render() {
-    const p = progress(), doneN = A.lessons.filter((l) => (p[l.id] || 0) >= 80).length;
+    const p = progress(), doneN = summary().done;
     $("#arab-body").innerHTML = `
       <div class="card hero-card"><span class="tile-icon t-blue" style="margin:0 auto 8px">${Icons.get("letters")}</span><h3>Qur'on o'qishni o'rganamiz</h3>
         <p class="small muted">Alifbodan boshlab Fotiha surasini o'qishgacha — ${A.lessons.length} ta dars.</p>
@@ -111,5 +117,5 @@ window.Arabic = (function () {
 
   App.onTab("arab", render);
   // openLesson/letterCard video.js dan ham ishlatiladi (video darslar bilan birlashtirish uchun)
-  return { render, letterCard, openLetter, openLesson };
+  return { render, summary, letterCard, openLetter, openLesson };
 })();

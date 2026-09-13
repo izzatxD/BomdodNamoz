@@ -108,13 +108,6 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .tile:active { transform: scale(.97); }
 .tile-icon { width: 42px; height: 42px; border-radius: 13px; display: grid; place-items: center; margin-bottom: 10px; }
 .tile b { font-size: 15px; font-weight: 700; } .tile small { color: var(--muted); font-size: 12px; }
-.t-green { background: var(--primary-soft); color: var(--primary); }
-.t-gold { background: var(--gold-soft); color: var(--gold); }
-.t-blue { background: rgba(52,120,246,.12); color: #3478F6; }
-.t-rose { background: rgba(232,93,117,.12); color: #E85D75; }
-.t-teal { background: rgba(0,150,170,.12); color: #0096AA; }
-.t-purple { background: rgba(140,82,255,.12); color: #8C52FF; }
-
 .quote { position: relative; margin-top: 20px; padding: 18px 18px 14px 20px; border-radius: var(--r); background: var(--gold-soft); border-left: 3px solid var(--gold); }
 .quote-mark { position: absolute; top: 6px; right: 14px; font-size: 56px; line-height: 1; color: var(--gold); opacity: .35; font-family: Georgia, serif; }
 .quote p { margin: 0 0 6px; font-size: 14.5px; font-weight: 500; line-height: 1.55; }
@@ -127,6 +120,16 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .menu-text { flex: 1; display: flex; flex-direction: column; }
 .menu-text b { font-size: 15px; } .menu-text small { color: var(--muted); font-size: 12.5px; }
 .menu-arrow { color: var(--muted); }
+
+/* Rang sinflari — .tile-icon va .menu-icon bilan birga ishlatiladi.
+   MUHIM: .menu-icon o'z foni va rangini beradi, shuning uchun bu ro'yxat undan
+   KEYIN turishi kerak — aks holda «menu-icon t-rose» rangi bosilib qoladi. */
+.t-green { background: var(--primary-soft); color: var(--primary); }
+.t-gold { background: var(--gold-soft); color: var(--gold); }
+.t-blue { background: rgba(52,120,246,.12); color: #3478F6; }
+.t-rose { background: rgba(232,93,117,.12); color: #E85D75; }
+.t-teal { background: rgba(0,150,170,.12); color: #0096AA; }
+.t-purple { background: rgba(140,82,255,.12); color: #8C52FF; }
 .card { background: var(--surface); border-radius: var(--r); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
 .card p { margin: 0 0 6px; } .card p:last-child { margin-bottom: 0; }
 .card-label { font-size: 11.5px; text-transform: uppercase; color: var(--muted); font-weight: 700; letter-spacing: .08em; margin-bottom: 6px; }
@@ -518,6 +521,12 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .hero-all div.now small, .hero-all div.now .ic { opacity: 1; }
 .hero-all div.now b { color: #7CFFC4; }
 .hero-city.gps { background: rgba(124,255,196,.18); border-color: rgba(124,255,196,.35); }
+
+/* Hero ichidagi yagona asosiy harakat — hozirgi vaqtga mos taklif */
+.hero-action { width: 100%; margin-top: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 16px; border-radius: 15px; background: #fff; color: var(--primary-deep); font-size: 15px; font-weight: 800; box-shadow: 0 4px 14px rgba(0,0,0,.16); transition: transform .12s, opacity .12s; }
+.hero-action:active { transform: scale(.98); opacity: .9; }
+/* Bugungi ish tugagan — chaqiruv emas, tinch tasdiq */
+.hero-action.done { background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.28); color: #fff; box-shadow: none; font-weight: 700; }
 
 /* keyingi namoz — 6 ta vaqt qatorida ajratib ko'rsatiladi */
 

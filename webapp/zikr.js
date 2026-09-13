@@ -231,8 +231,13 @@ window.Zikr = (function () {
     const tr = body.querySelector("#tb-reset"); if (tr) tr.addEventListener("click", () => { tasbihCount = 0; render(); });
   }
 
+  // Bosh sahifadagi «hozir nima qilay» tugmasi kerakli bo'limni shu orqali ochadi
+  function open(k) {
+    if (k) kind = k;
+    App.showTab("zikr");
+  }
 
   $$("#zikr-seg .seg").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.kind; render(); }));
   App.onTab("zikr", render);
-  return { summary, render };
+  return { summary, render, open };
 })();
