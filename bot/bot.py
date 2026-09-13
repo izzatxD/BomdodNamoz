@@ -180,21 +180,44 @@ EVENING_TIPS = [
 ]
 
 
-# ---------- foydalanuvchilar (eslatma yoqqanlar) ----------
-def load_users() -> dict:
-    if USERS_FILE.exists():
+# ---------- eski users.json dan bazaga ko'chirish (bir martalik) ----------
+def migrate_users_json() -> None:
+    """
+    Eslatmalar avval bot/users.json da turardi. Fayl har o'zgarishda butunlayiga
+    qayta yozilar edi — jarayon shu paytda uzilsa ro'yxat yo'qolardi. Endi bazada.
+    Ko'chirish bir marta ishlaydi; fayl o'chirilmaydi, nomiga «.imported» qo'shiladi.
+    """
+    # Belgi fayli — ko'chirish faqat BIR marta bo'lishi uchun. Aks holda qayta ishga
+    # tushganda obunadan chiqqan odamning eslatmasi yana yoqilib ketardi.
+    marker = db.DATA_DIR / ".users_imported"
+    if marker.exists() or not USERS_FILE.exists():
+        return
+    try:
+        data = json.loads(USERS_FILE.read_text("utf-8"))
+    except Exception as e:  # noqa: BLE001
+        # Fayl buzuq bo'lsa qo'lda tekshirish mumkin bo'lsin — o'chirmaymiz, nomini ham o'zgartirmaymiz
+        logging.error("users.json o'qilmadi (%s) — eslatmalar ko'chirilmadi, fayl joyida qoldi.", e)
+        return
+    rows: list[tuple[int, str, bool]] = []
+    for chat_id, u in (data or {}).items():
         try:
-            return json.loads(USERS_FILE.read_text("utf-8"))
-        except Exception:  # noqa: BLE001
-            return {}
-    return {}
-
-
-def save_users(users: dict) -> None:
-    USERS_FILE.write_text(json.dumps(users, ensure_ascii=False, indent=1), "utf-8")
-
-
-USERS = load_users()  # {"chat_id": {"remind": true, "name": "..."}}
+            cid = int(chat_id)
+        except (TypeError, ValueError):
+            continue
+        # Manfiy id — guruh chati. Eslatma shaxsiy sozlama, guruhga tegishli emas.
+        if cid <= 0 or not isinstance(u, dict):
+            continue
+        rows.append((cid, str(u.get("name") or ""), bool(u.get("remind"))))
+    on = db.import_reminders(rows)
+    try:
+        marker.write_text(str(int(time.time())))
+    except Exception as e:  # noqa: BLE001
+        logging.error("Import belgisi yozilmadi (%s) — bot qayta ishga tushsa import takrorlanadi.", e)
+    try:
+        USERS_FILE.replace(USERS_FILE.with_name(USERS_FILE.name + ".imported"))
+    except Exception as e:  # noqa: BLE001
+        logging.warning("users.json nomi o'zgartirilmadi: %s", e)
+    logging.info("users.json bazaga ko'chirildi: %d yozuv, %d tasida eslatma yoqilgan.", len(rows), on)
 
 
 # ---------- klaviaturalar ----------
@@ -276,8 +299,6 @@ def city_times(city_key: str) -> tuple[str, dict[str, str]] | None:
 async def cmd_start(message: Message, command: CommandObject) -> None:
     user = message.from_user
     name = user.first_name if user else "do'stim"
-    USERS.setdefault(str(message.chat.id), {"remind": False, "name": name})
-    save_users(USERS)
     if user:
         db.ensure_user(user.id, name)
         db.set_blocked(user.id, False)  # qaytib keldi — eslatma va e'lonlar yana boradi
@@ -386,8 +407,13 @@ async def cmd_vaqt(message: Message) -> None:
 @router.message(Command("eslatma"))
 @router.message(F.text == "🔔 Eslatma")
 async def cmd_eslatma(message: Message) -> None:
-    u = USERS.setdefault(str(message.chat.id), {"remind": False})
-    on = u.get("remind", False)
+    user = message.from_user
+    if message.chat.type != "private" or not user:
+        # Eslatma — shaxsiy sozlama, u odamning o'z chatiga keladi
+        await message.answer("🔔 Eslatma shaxsiy sozlama. Bot bilan shaxsiy chatda <code>/eslatma</code> yozing.", parse_mode="HTML")
+        return
+    db.ensure_user(user.id, user.first_name or "")
+    on = db.get_remind(user.id)
     await message.answer(
         "🔔 <b>Zikr eslatmalari</b>\n\n"
         f"Holat: <b>{'yoqilgan ✅' if on else 'o‘chirilgan'}</b>\n\n"
@@ -402,10 +428,13 @@ async def cmd_eslatma(message: Message) -> None:
 @router.callback_query(F.data.startswith("remind:"))
 async def cb_remind(query: CallbackQuery) -> None:
     on = query.data == "remind:on"
-    u = USERS.setdefault(str(query.message.chat.id), {})
-    u["remind"] = on
-    save_users(USERS)
-    await query.message.edit_reply_markup(reply_markup=remind_keyboard(on))
+    db.ensure_user(query.from_user.id, query.from_user.first_name or "")
+    db.set_remind(query.from_user.id, on)
+    if query.message:  # juda eski xabarda tugma bosilsa message bo'lmasligi mumkin
+        try:
+            await query.message.edit_reply_markup(reply_markup=remind_keyboard(on))
+        except TelegramBadRequest:
+            pass
     await query.answer("Eslatma yoqildi ✅" if on else "Eslatma o'chirildi")
 
 
@@ -715,10 +744,7 @@ async def run_broadcast(bot: Bot, admin: int, d: dict, seg: str, ids: list[int],
                 sent += 1
             elif r == "blocked":
                 blocked += 1
-                db.set_blocked(chat_id, True)
-                u = USERS.get(str(chat_id))
-                if u:
-                    u["remind"] = False
+                db.set_blocked(chat_id, True)  # eslatmalar ham to'xtaydi (db.remind_users bloklaganlarni chiqarmaydi)
             else:
                 failed += 1
             if status and i % 25 == 0:
@@ -730,7 +756,6 @@ async def run_broadcast(bot: Bot, admin: int, d: dict, seg: str, ids: list[int],
     finally:
         _broadcast.update(running=False, stop=False)
         db.finish_broadcast(bid, sent, blocked, failed)
-        save_users(USERS)
     stopped = sent + blocked + failed < len(ids)
     head = "⏹ To'xtatildi" if stopped else "✅ Yuborildi"
     report = (
@@ -975,7 +1000,7 @@ def stat_text() -> str:
         f"   {WEEKDAYS_SHORT[d.weekday()]}  {bar(n)}  {n}" for d, n in s["chart"]
     )
     avg = (s["nur_today"] // s["dau"]) if s["dau"] else 0
-    reminders = sum(1 for u in USERS.values() if u.get("remind"))
+    reminders = db.remind_count()
 
     # Disk holati. "vaqtinchalik" chiqsa — Volume ulanmagan va baza har deploy'da o'chadi.
     since = db.data_since()
@@ -1146,28 +1171,25 @@ async def send_reminders(bot: Bot, kind: str) -> None:
             "5 daqiqa ajrating — bugungi vazifani yakunlang ✅"
         )
     sent = failed = 0
-    for chat_id, u in list(USERS.items()):
-        if not u.get("remind"):
-            continue
+    for chat_id in db.remind_users():
         try:
-            await bot.send_message(int(chat_id), text, reply_markup=open_app_keyboard(), parse_mode="HTML")
+            await bot.send_message(chat_id, text, reply_markup=open_app_keyboard(), parse_mode="HTML")
             sent += 1
             await asyncio.sleep(0.05)  # Telegram limitiga rioya
         except TelegramRetryAfter as e:
             await asyncio.sleep(e.retry_after + 1)
             failed += 1
         except (TelegramForbiddenError, TelegramBadRequest) as e:
-            # Bloklagan yoki chat yo'q — boshqa urinmaymiz, e'lonlarga ham kirmaydi
+            # Bloklagan yoki chat yo'q — boshqa urinmaymiz, e'lonlarga ham kirmaydi.
+            # «remind» bayrog'i saqlanadi: qaytib kelsa (/start) eslatma o'zi tiklanadi.
             if isinstance(e, TelegramForbiddenError) or "chat not found" in str(e).lower():
-                u["remind"] = False
-                db.set_blocked(int(chat_id), True)
+                db.set_blocked(chat_id, True)
             else:
                 failed += 1
                 logging.warning("Eslatma yuborilmadi %s: %s", chat_id, e)
         except Exception as e:  # noqa: BLE001
             failed += 1
             logging.warning("Eslatma yuborilmadi %s: %s", chat_id, e)
-    save_users(USERS)
     logging.info("%s eslatmasi %d kishiga yuborildi, %d xato", kind, sent, failed)
     if failed >= 5 and failed * 5 >= sent + failed:  # 20% dan ko'pi yetmadi — tarmoq yoki Telegram muammosi
         await notify_admins(
@@ -1207,6 +1229,8 @@ async def main() -> None:
     bot = Bot(token=BOT_TOKEN)
     dp = Dispatcher()
     dp.include_router(router)
+
+    migrate_users_json()  # eski eslatma ro'yxati bazaga (bir martalik, fayl saqlanib qoladi)
 
     me = await bot.get_me()
     BOT_USERNAME = me.username or ""

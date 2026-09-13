@@ -1,6 +1,8 @@
 # sirlar va mahalliy ma'lumotlar
 .env
 users.json
+users.json.imported
+.users_imported
 
 # baza (Railway'da volume ichida turadi)
 *.db

@@ -487,18 +487,13 @@ async def admin_lookup(request: web.Request) -> web.Response:
 async def admin_stats(request: web.Request) -> web.Response:
     """
     Admin sahifasi. MAXFIYLIK: faqat yig'indilar — bitta foydalanuvchining ma'lumoti chiqmaydi.
-    Eslatma yoqqanlar soni bot/users.json dan (bot.py yuritadi), oxirgi zaxira vaqti .last_backup dan.
+    Oxirgi zaxira vaqti .last_backup faylidan (bot.py yozadi), qolgani bazadan.
     """
     if not _is_admin(request):
         return web.json_response({"error": "forbidden"}, status=403)
     cfg = request.app["cfg"]
     out = db.admin_stats(_today(cfg["tz"]), cfg["tz"])
-    reminders = 0
-    try:
-        data = json.loads((db.DATA_DIR / "users.json").read_text("utf-8"))
-        reminders = sum(1 for u in data.values() if isinstance(u, dict) and u.get("remind"))
-    except Exception:  # noqa: BLE001
-        pass
+    reminders = db.remind_count()
     last_backup = 0
     try:
         last_backup = int((db.DATA_DIR / ".last_backup").read_text().strip() or 0)

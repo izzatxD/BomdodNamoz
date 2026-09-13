@@ -120,6 +120,7 @@ MIGRATIONS = [
     ("videos", "playlist", "TEXT NOT NULL DEFAULT ''"),  # YouTube playlist ID (bo'sh bo'lsa — oddiy video)
     ("users", "total", "INTEGER NOT NULL DEFAULT 0"),     # keshlangan jami Nur (all_totals() endi jadvalni qo'shib chiqmaydi)
     ("users", "blocked", "INTEGER NOT NULL DEFAULT 0"),   # botni bloklagan — eslatma va e'lon yuborilmaydi
+    ("users", "remind", "INTEGER NOT NULL DEFAULT 0"),    # zikr eslatmalari yoqilganmi (avval bot/users.json da edi)
 ]
 
 _conn: sqlite3.Connection | None = None
@@ -236,6 +237,47 @@ def data_since() -> int:
         return now
     except Exception:  # noqa: BLE001
         return 0
+
+
+# ---------- zikr eslatmalari ----------
+# Avval bot/users.json faylida saqlanardi. Fayl butunlayiga qayta yozilar edi:
+# jarayon shu paytda uzilsa (deploy, qayta ishga tushirish) fayl yarim qolib,
+# o'qishda xato berardi va BARCHA obunalar jimgina yo'qolardi. Endi bazada —
+# ya'ni /backup nusxasiga ham tushadi va tiklanadi.
+def set_remind(uid: int, on: bool) -> None:
+    c = conn()
+    c.execute("UPDATE users SET remind=? WHERE id=?", (1 if on else 0, uid))
+    c.commit()
+
+
+def get_remind(uid: int) -> bool:
+    row = conn().execute("SELECT remind FROM users WHERE id=?", (uid,)).fetchone()
+    return bool(row["remind"]) if row else False
+
+
+def remind_users() -> list[int]:
+    """Eslatma yuboriladiganlar. Bloklaganlar chiqmaydi — lekin bayrog'i saqlanadi,
+    shuning uchun qaytib kelsa (/start → blocked=0) eslatma o'zi tiklanadi."""
+    rows = conn().execute("SELECT id FROM users WHERE remind = 1 AND blocked = 0 AND id > 0").fetchall()
+    return [int(r["id"]) for r in rows]
+
+
+def remind_count() -> int:
+    return int((conn().execute("SELECT COUNT(*) FROM users WHERE remind = 1 AND blocked = 0").fetchone() or [0])[0] or 0)
+
+
+def import_reminders(rows: list[tuple[int, str, bool]]) -> int:
+    """Eski users.json dan bir martalik ko'chirish. (id, ism, eslatma) —
+    mavjud foydalanuvchining ismiga tegilmaydi. Qaytaradi: eslatma yoqilganlar soni."""
+    c = conn()
+    now = int(time.time())
+    c.executemany(
+        "INSERT OR IGNORE INTO users (id, name, created, updated) VALUES (?,?,?,?)",
+        [(uid, (name or "")[:24], now, now) for uid, name, _ in rows],
+    )
+    c.executemany("UPDATE users SET remind=1 WHERE id=?", [(uid,) for uid, _, on in rows if on])
+    c.commit()
+    return sum(1 for _, _, on in rows if on)
 
 
 # ---------- e'lonlar (admin) va bloklaganlar ----------
