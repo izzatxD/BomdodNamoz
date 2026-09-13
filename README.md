@@ -31,13 +31,27 @@ bomdodnamozappbot/
 │   ├── vaqt.py           ← namoz vaqtlari — vaqt.js bilan bir xil algoritm (/vaqt uchun)
 │   ├── requirements.txt
 │   └── .env.example
+├── test/                 ← sinovlar (tashqi kutubxonasiz, CI da avtomatik ishlaydi)
+│   ├── store.test.js     ← ma'lumot yo'qolmasligi
+│   ├── nur.test.js       ← ball tizimi va balansi
+│   └── sync.test.js      ← ilova ↔ bot mosligi (takrorlangan ro'yxatlar ajralib ketmasin)
 └── README.md
 ```
 
 ## Mini App imkoniyatlari
 
+**Navigatsiya.** Pastda 5 ta manzil: **Bosh · Namoz · Zikr · Ta'lim · Reyting**.
+Qolgan ekranlar shularning ichida yashaydi — Qazo → Namoz; Arab tili, Suralar, Video → Ta'lim
+(`app.js` dagi `navParent`). Shuning uchun istalgan ekranda pastda qaysi bo'limdaligingiz yonib turadi,
+orqaga tugmasi ham bir pog'ona yuqoriga olib chiqadi. Bosh sahifadagi kartochkalar — tezkor yo'llar.
+
 - Bosh sahifada erkak / ayol tanlanadi (keyin eslab qoladi, chip orqali almashtirish mumkin)
-- **Namoz qadam-baqadam**: 13 ta qadam, har birida erkak va ayol uchun farqlar alohida; sunnat / farz niyati
+- **«Hozir nima qilay?»** — hero ichida bitta tugma, vaqtga qarab o'zgaradi: bomdod vaqtida «Bomdod namozini
+  o'qish», quyoshdan keyin «Tongi zikrlar», shomdan keyin «Tungi zikrlar», hammasi bajarilsa — tinch tasdiq.
+  Bajarilgan ish qayta taklif qilinmaydi
+- **Namoz qadam-baqadam**: 13 ta qadam, har birida erkak va ayol uchun farqlar alohida; sunnat / farz niyati.
+  Qadam-baqadam ko'rsatma **bomdod** uchun yozilgan (sarlavhada shunday deb turadi) — shu sahifaning oxirida
+  peshin, asr, shom, xufton va jumaning **video darslariga** o'tish ro'yxati bor
 - **Zikrlar**
   - 🌅 Tong (14 ta) va 🌙 Tun (15 ta) zikrlari — har biri hisoblagich bilan: bosib sanaysiz, sanoq to'lganda avtomatik keyingisiga o'tadi
   - 📿 Tasbih — 8 xil zikr, katta tugma, kunlik natijalar
@@ -68,8 +82,10 @@ bomdodnamozappbot/
 
 - `/start` — tanishuv, «Ilovani ochish» tugmasi
 - `/vaqt [shahar]` — bugungi 6 ta namoz vaqti (ilova bilan bir xil hisob, `vaqt.py`)
-- `/eslatma` — **tong (06:00) va tun (18:00) zikri eslatmalarini** yoqish/o'chirish. Har kuni boshqa zikr matni bilan keladi, ilovani ochish tugmasi bilan. Vaqtlarni `.env` da `MORNING_HOUR` / `EVENING_HOUR` orqali o'zgartirasiz
-- Eslatma yoqqan foydalanuvchilar `bot/users.json` da saqlanadi (git'ga qo'shilmaydi)
+- `/eslatma` — **tong (06:00) va tun (18:00) zikri eslatmalarini** yoqish/o'chirish (shaxsiy chatda). Har kuni boshqa zikr matni bilan keladi, ilovani ochish tugmasi bilan. Vaqtlarni `.env` da `MORNING_HOUR` / `EVENING_HOUR` orqali o'zgartirasiz
+- Eslatma obunasi **bazada** (`users.remind`) saqlanadi — ya'ni `/backup` nusxasiga tushadi va tiklanadi.
+  Botni bloklagan odamga yuborilmaydi, lekin obunasi o'chmaydi: `/start` bilan qaytsa eslatma o'zi tiklanadi.
+  Eski `bot/users.json` bo'lsa, bot birinchi ishga tushganda bazaga ko'chiradi va faylni `.imported` deb belgilaydi
 - `/reyting` — haftalik Nur natijasi va o'rin; guruhda yozilsa — jamoa jadvali
 - `/jamoa` — guruhda yozilsa, guruh **jamoaga** aylanadi (a'zolar bir tugma bilan qo'shiladi)
 - `/stat` — **admin statistikasi**: jami foydalanuvchi, bugungi va haftalik faollar,
@@ -335,9 +351,19 @@ Musobaqa (liga, jamoa, do'stlar) server ulanganda yonadi — yuqoridagi **«Inte
 ```bash
 node test/store.test.js    # ma'lumot yo'qolmasligi (CloudStorage 4KB bo'linishi)
 node test/nur.test.js      # ball tizimi: chegaralar, balans, streak, darajalar
+node test/sync.test.js     # ilova ↔ bot mosligi (CAP, darajalar, bo'limlar, shaharlar, formula)
 ```
 
-Ikkalasi ham tashqi kutubxonasiz, faqat Node kerak. `nur.test.js` balansni ham tekshiradi —
+Uchalasi ham `.github/workflows/test.yml` orqali **har push va PR'da avtomatik** ishlaydi
+(u yerda `python -m compileall bot` ham bor — sintaksis xatosi Railway'ga chiqmasdan ushlanadi).
+
+`sync.test.js` ataylab takrorlangan ro'yxatlarni ikki tomondan o'qib solishtiradi. Bu loyihadagi
+eng oson xato — bir tomonini o'zgartirib ikkinchisini unutish: hech narsa buzilmaydi, shunchaki
+server boshqacha hisoblay boshlaydi. Tekshiriladiganlar: `nur.js` CAP ↔ `api.py` CAPS,
+`nur.js` LEVELS ↔ `db.py` LEVELS, `data.js` videoSections ↔ `bot.py` SECTIONS ↔ `api.py`
+VIDEO_SECTIONS, `data.js` cities ↔ `bot.py` CITIES, `vaqt.js` ↔ `vaqt.py` konstantalari.
+
+Hammasi tashqi kutubxonasiz, faqat Node kerak. `nur.test.js` balansni ham tekshiradi —
 vaznlarni o'zgartirsangiz, biror kategoriya haddan tashqari ustun bo'lib ketmaganini aytadi.
 `nur.js` dagi `CAP` va `api.py` dagi `CAPS` doim bir xil bo'lishi shart.
 
