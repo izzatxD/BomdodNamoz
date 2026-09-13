@@ -49,6 +49,7 @@ window.Nur = (function () {
   // shundan keyin bulutga JIMGINA yozilmay qoladi va qurilma almashtirilganda
   // hammasi yo'qoladi. O'tgan kunlarning Nur'i "nur" kalitiga yig'ib boriladi.
   function saveDays(d) {
+    settle(d);                                   // KESISHDAN OLDIN: o'chib ketadigan kunlar jamiga qo'shilsin
     const keys = Object.keys(d).sort();
     while (keys.length > 45) delete d[keys.shift()];
     Store.set("days", d);
@@ -88,16 +89,24 @@ window.Nur = (function () {
   function scoreOn(d, k) { return dayScore(d[k], streakAt(d, k)); }
   function today() { return scoreOn(days(), Store.today()); }
 
-  // Jami Nur. days{} 45 kundan keyin tozalanadi — shuning uchun o'tgan kunlar "nur" kalitiga yig'ib boriladi
-  function total() {
-    const d = days(), td = Store.today();
-    const acc = Store.get("nur", { total: 0, upto: "" });
+  // Tugagan kunlarning Nur'ini "nur" kalitiga ko'chiradi (acc.upto — qayergacha ko'chirilgani).
+  // days{} 45 kundan keyin tozalanadi, shuning uchun bu YOZUV shart: aks holda o'sha
+  // kunlarning bali butunlay yo'qolardi. saveDays() ni kesishdan oldin chaqiradi.
+  // Bugungi kun ko'chirilmaydi — u hali o'zgarishi mumkin.
+  function settle(d) {
+    const td = Store.today(), acc = Store.get("nur", { total: 0, upto: "" });
     let changed = false;
     Object.keys(d).sort().forEach((k) => {
       if (k < td && k > acc.upto) { acc.total += scoreOn(d, k).total; acc.upto = k; changed = true; }
     });
     if (changed) Store.set("nur", acc);
-    return acc.total + scoreOn(d, td).total;
+    return acc;
+  }
+
+  // Jami Nur = ko'chirilgan yig'indi + bugungi kun
+  function total() {
+    const d = days();
+    return settle(d).total + scoreOn(d, Store.today()).total;
   }
 
   function level(tot) {
@@ -164,5 +173,5 @@ window.Nur = (function () {
     return BADGES.map((b) => ({ id: b.id, name: b.name, desc: b.desc, icon: b.icon, private: !!b.private, earned: earned[b.id] || null, isNew: earned[b.id] === td }));
   }
 
-  return { CAP, W, LEVELS, dayScore, streakAt, streak, today, week, lastDays, total, level, badges, bump, context };
+  return { CAP, W, LEVELS, dayScore, streakAt, streak, today, week, lastDays, total, settle, saveDays, level, badges, bump, context };
 })();

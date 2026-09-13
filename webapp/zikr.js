@@ -10,11 +10,9 @@ window.Zikr = (function () {
   // days: { "2026-09-02": { t: 5, n: 3, s: {subhanalloh: 33}, ok: true } }  (ixcham, 45 kun)
   // today: { d: "2026-09-02", tong: ["t_kursi"...], tun: [...] }            (bugungi batafsil)
   function days() { return Store.get("days", {}); }
-  function saveDays(d) {
-    const keys = Object.keys(d).sort();
-    while (keys.length > 45) delete d[keys.shift()];
-    Store.set("days", d);
-  }
+  // Saqlash va 45 kundan eskisini tozalash qoidasi Nur modulida — u yerda o'chadigan
+  // kunlarning bali avval jamiga ko'chiriladi. Bu yerda takrorlamaymiz.
+  function saveDays(d) { Nur.saveDays(d); }
   function todayRec() {
     const t = Store.get("today", null), td = Store.today();
     if (!t || t.d !== td) return { d: td, tong: [], tun: [] };
@@ -232,6 +230,7 @@ window.Zikr = (function () {
     const tb = body.querySelector("#tb-btn"); if (tb) tb.addEventListener("click", tasbihTap);
     const tr = body.querySelector("#tb-reset"); if (tr) tr.addEventListener("click", () => { tasbihCount = 0; render(); });
   }
+
 
   $$("#zikr-seg .seg").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.kind; render(); }));
   App.onTab("zikr", render);

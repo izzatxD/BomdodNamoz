@@ -183,14 +183,20 @@ const ok = (name, cond, extra) => {
   console.log("\n10) Kun tarixi cheksiz o'smaydi");
   // days{} har kuni ~140 bayt o'sadi. Cheklanmasa ~15 oydan keyin bulutning
   // 64 KB chegarasidan oshadi va cloudSet JIMGINA yozmay qo'yadi — qurilma
-  // almashtirilganda hammasi yo'qoladi. Ikkala yozuvchi ham 45 kun bilan
-  // cheklashi shart: zikr.js (zikr qilganda) va nur.js (qazo/dars belgilanganda).
-  const src = require("fs").readFileSync(path.join(__dirname, "..", "webapp", "nur.js"), "utf8");
-  const zsrc = require("fs").readFileSync(path.join(__dirname, "..", "webapp", "zikr.js"), "utf8");
-  ok("nur.js cheklaydi", /while \(keys\.length > 45\)/.test(src));
-  ok("zikr.js cheklaydi", /while \(keys\.length > 45\)/.test(zsrc));
-  ok("nur.js to'g'ridan-to'g'ri yozmaydi", (src.match(/Store\.set\("days"/g) || []).length === 1);
-  ok("zikr.js to'g'ridan-to'g'ri yozmaydi", (zsrc.match(/Store\.set\("days"/g) || []).length === 1);
+  // almashtirilganda hammasi yo'qoladi. Shuning uchun kesish qoidasi BITTA joyda
+  // bo'lishi shart: nur.js dagi saveDays(). Boshqa modullar (zikr.js) Nur.saveDays()
+  // orqali o'tadi — shunda na kesish, na o'tgan kunlarni jamiga ko'chirish o'tkazib yuboriladi.
+  const fs = require("fs");
+  const webDir = path.join(__dirname, "..", "webapp");
+  const src = fs.readFileSync(path.join(webDir, "nur.js"), "utf8");
+  ok("nur.js 45 kun bilan cheklaydi", /while \(keys\.length > 45\)/.test(src));
+  ok("kesishdan OLDIN jamiga ko'chiriladi", /settle\(d\);[\s\S]{0,240}keys\.length > 45/.test(src));
+  const writers = fs.readdirSync(webDir).filter((f) => f.endsWith(".js"))
+    .map((f) => [f, (fs.readFileSync(path.join(webDir, f), "utf8").match(/Store\.set\("days"/g) || []).length])
+    .filter(([, n]) => n > 0);
+  ok("days{} ni faqat nur.js yozadi",
+    writers.length === 1 && writers[0][0] === "nur.js" && writers[0][1] === 1,
+    "yozuvchilar: " + (writers.map(([f, n]) => `${f}×${n}`).join(", ") || "yo'q"));
 
   // 45 kunlik eng og'ir holat bulutga to'liq sig'ishi kerak (16 bo'lak = 64 KB)
   const K = makeEnv();
