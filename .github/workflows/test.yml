@@ -1,0 +1,37 @@
+# Har push va pull request'da sinovlarni ishga tushiradi.
+# Maqsad: Mini App va bot ajralib ketmasin, ball tizimi buzilmasin.
+# Sinovlar tashqi kutubxonasiz — o'rnatish bosqichi kerak emas.
+name: Sinovlar
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Saqlash (CloudStorage 4KB bo'linishi)
+        run: node test/store.test.js
+
+      - name: Ball tizimi (chegaralar, balans, streak, darajalar)
+        run: node test/nur.test.js
+
+      - name: Ilova ↔ bot mosligi (CAP, darajalar, bo'limlar, shaharlar, formula)
+        run: node test/sync.test.js
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Sintaksis xatosi Railway'ga chiqmasdan oldin shu yerda ushlansin
+      - name: Bot sintaksisi
+        run: python -m compileall -q bot

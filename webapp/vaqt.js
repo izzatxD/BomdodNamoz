@@ -89,5 +89,6 @@ window.Vaqt = (function () {
     return null;
   }
 
-  return { times, hijri, LAT, ANGLE, SHOM_PLUS };
+  // Konstantalar tashqariga chiqariladi — test/sync.test.js ularni bot/vaqt.py bilan solishtiradi
+  return { times, hijri, LAT, ANGLE, SHOM_PLUS, ASR_SHADOW, TZ };
 })();
