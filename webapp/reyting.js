@@ -8,12 +8,14 @@ window.Reyting = (function () {
   const tg = window.Telegram && window.Telegram.WebApp;
   const DAYS = ["Du", "Se", "Ch", "Pa", "Ju", "Sh", "Ya"];
   const MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
+  // Izohlardagi raqamlar Nur.W dan olinadi — vaznni o'zgartirsangiz matn o'zi yangilanadi
+  const W = Nur.W;
   const CATS = [
-    { id: "zikr",   label: "Tongi va tungi zikrlar", icon: "sunrise",  hint: "har zikr 2 · to'liq to'plam +30" },
-    { id: "tasbih", label: "Tasbih",               icon: "beads",    hint: "har 33 marta — 5" },
-    { id: "qazo",   label: "Qazo namozlar",        icon: "calendar", hint: "har namoz 15 · faqat sizga ko'rinadi", private: true },
-    { id: "ilm",    label: "Arab tili darslari",   icon: "letters",  hint: "har dars 40 (test 80%+)" },
-    { id: "odat",   label: "Kunlik vazifalar",     icon: "sprout",   hint: "to'liq bajarilsa 50 + streak bonusi" },
+    { id: "zikr",   label: "Tongi va tungi zikrlar", icon: "sunrise",  hint: `har zikr ${W.zikr} · to'liq to'plam +${W.zikrFull}` },
+    { id: "tasbih", label: "Tasbih",               icon: "beads",    hint: `har 33 marta — ${W.tasbih33}` },
+    { id: "qazo",   label: "Qazo namozlar",        icon: "calendar", hint: `har namoz ${W.qazo} · faqat sizga ko'rinadi`, private: true },
+    { id: "ilm",    label: "Arab tili darslari",   icon: "letters",  hint: `har dars ${W.dars} (test 80%+)` },
+    { id: "odat",   label: "Kunlik vazifalar",     icon: "sprout",   hint: `to'liq bajarilsa ${W.odat} · har streak kuni +${W.streak} (${W.streakMax} gacha)` },
   ];
   let view = "men", scope = "liga", teamId = null, selDay = null;
 
