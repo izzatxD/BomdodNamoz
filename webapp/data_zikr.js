@@ -146,14 +146,14 @@ window.ZIKR_DATA = {
 
   // ---------- KUNLIK TASBIH (istalgan vaqtda) ----------
   tasbih: [
-    { id: "subhanalloh", title: "Subhaanalloh", arabic: "سُبْحَانَ اللَّهِ", meaning: "Alloh pokdir", target: 33 },
-    { id: "alhamdulillah", title: "Alhamdulillaah", arabic: "الْحَمْدُ لِلَّهِ", meaning: "Allohga hamd bo'lsin", target: 33 },
-    { id: "allohuakbar", title: "Allohu akbar", arabic: "اللَّهُ أَكْبَرُ", meaning: "Alloh buyukdir", target: 34 },
-    { id: "lailaha", title: "Laa ilaaha illalloh", arabic: "لَا إِلَٰهَ إِلَّا اللَّهُ", meaning: "Allohdan o'zga iloh yo'q", target: 100 },
-    { id: "istighfar", title: "Astag'firulloh", arabic: "أَسْتَغْفِرُ اللَّهَ", meaning: "Allohdan mag'firat so'rayman", target: 100 },
-    { id: "salavot", title: "Salavot", arabic: "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ", meaning: "Ey Alloh, Muhammadga salot yo'lla", target: 100 },
-    { id: "havqala", title: "Laa havla va laa quvvata", arabic: "لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ", meaning: "Kuch-quvvat faqat Alloh bilandir", target: 100 },
-    { id: "subhanbihamdihi", title: "Subhaanallohi va bihamdihi", arabic: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ", meaning: "Alloh pokdir va Unga hamd", target: 100 },
+    { id: "subhanalloh", title: "Subhaanalloh", arabic: "سُبْحَانَ اللَّهِ", latin: "Subhaanalloh", meaning: "Alloh pokdir", target: 33 },
+    { id: "alhamdulillah", title: "Alhamdulillaah", arabic: "الْحَمْدُ لِلَّهِ", latin: "Alhamdulillaah", meaning: "Allohga hamd bo'lsin", target: 33 },
+    { id: "allohuakbar", title: "Allohu akbar", arabic: "اللَّهُ أَكْبَرُ", latin: "Allohu akbar", meaning: "Alloh buyukdir", target: 34 },
+    { id: "lailaha", title: "Laa ilaaha illalloh", arabic: "لَا إِلَٰهَ إِلَّا اللَّهُ", latin: "Laa ilaaha illalloh", meaning: "Allohdan o'zga iloh yo'q", target: 100 },
+    { id: "istighfar", title: "Astag'firulloh", arabic: "أَسْتَغْفِرُ اللَّهَ", latin: "Astag'firulloh", meaning: "Allohdan mag'firat so'rayman", target: 100 },
+    { id: "salavot", title: "Salavot", arabic: "اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ", latin: "Allohumma solli 'alaa Muhammad", meaning: "Ey Alloh, Muhammadga salot yo'lla", target: 100 },
+    { id: "havqala", title: "Laa havla va laa quvvata", arabic: "لَا حَوْلَ وَلَا قُوَّةَ إِلَّا بِاللَّهِ", latin: "Laa havla va laa quvvata illaa billaah", meaning: "Kuch-quvvat faqat Alloh bilandir", target: 100 },
+    { id: "subhanbihamdihi", title: "Subhaanallohi va bihamdihi", arabic: "سُبْحَانَ اللَّهِ وَبِحَمْدِهِ", latin: "Subhaanallohi va bihamdih", meaning: "Alloh pokdir va Unga hamd", target: 100 },
   ],
 
   // ---------- 30 KUNLIK ODAT DASTURI ----------

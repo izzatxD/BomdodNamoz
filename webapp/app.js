@@ -13,11 +13,12 @@ window.App = (function () {
     suraKind: "suralar", tab: "home", arabicSize: 30,
   };
   const tabRenderers = {};          // modullar ro'yxatga oladi: App.onTab("zikr", fn)
-  const titles = { home: "Bomdod namozi", namoz: "Bomdod — qadamlar", qazo: "Qazo namozlar", zikr: "Zikrlar", talim: "Ta'lim", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting", admin: "Admin" };
+  const tabLeavers = {};            // bo'limdan chiqilganda — datchik/taymerni o'chirish uchun
+  const titles = { home: "Bomdod namozi", namoz: "Namoz", qadam: "Bomdod qadamlari", boshqa: "Namoz video darslari", qazo: "Qazo namozlar", qibla: "Qibla", zikr: "Zikrlar", talim: "Ta'lim", arab: "Arab tili", suralar: "Suralar va duolar", video: "Video darslar", reyting: "Reyting", admin: "Admin" };
   // Pastki menyuda 5 ta manzil bor; qolgan ekranlar shularning ICHIDA yashaydi.
   // Bu yerda "qaysi tugma yonsin" emas, ekranning OTASI yoziladi — shuning uchun
   // orqaga qaytish ham, yonib turgan tugma ham foydalanuvchi kutgandek chiqadi.
-  const navParent = { qazo: "namoz", arab: "talim", suralar: "talim", video: "talim", admin: "home" };
+  const navParent = { qadam: "namoz", boshqa: "namoz", qazo: "namoz", qibla: "home", arab: "talim", suralar: "talim", video: "talim", admin: "home" };
 
   function haptic(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.impactOccurred(type || "light"); } catch (e) {} }
   function notify(type) { try { tg && tg.HapticFeedback && tg.HapticFeedback.notificationOccurred(type || "success"); } catch (e) {} }
@@ -62,7 +63,7 @@ window.App = (function () {
     $("#btn-gender").addEventListener("click", () => { haptic(); setGender(state.gender === "erkak" ? "ayol" : "erkak", false); });
     $$(".nav").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
     $$("[data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
-    $$("#rakat-seg .seg").forEach((b) => b.addEventListener("click", () => { state.rakat = b.dataset.rakat; state.step = 0; renderNamoz(); }));
+    $$("#rakat-seg .seg").forEach((b) => b.addEventListener("click", () => { state.rakat = b.dataset.rakat; state.step = 0; renderQadam(); }));
     $$("#sura-seg .seg").forEach((b) => b.addEventListener("click", () => { state.suraKind = b.dataset.kind; renderSuraList(); }));
     $("#step-prev").addEventListener("click", () => { if (state.step > 0) { state.step--; haptic(); renderStep(); } });
     $("#step-next").addEventListener("click", () => { if (state.step < D.namoz.steps.length - 1) { state.step++; haptic(); renderStep(); } });
@@ -105,19 +106,20 @@ window.App = (function () {
     $("#btn-gender").textContent = g === "erkak" ? "👨 Erkak" : "🧕 Ayol";
     $("#topbar-sub").textContent = g === "erkak" ? "Erkaklar uchun ko'rsatma" : "Ayollar uchun ko'rsatma";
     if (enter) { haptic("medium"); enterApp(); }
-    else { renderNamoz(); renderVideos(); }
+    else { renderQadam(); renderVideos(); }
   }
 
   function enterApp() {
     $("#screen-welcome").classList.remove("active");
     $("#app").classList.remove("hidden");
     setGender(state.gender, false);
-    renderNamoz(); renderSuraList(); renderVideos(); loadPrayerTimes();
+    renderQadam(); renderSuraList(); renderVideos(); loadPrayerTimes();
     showTab("home");
   }
 
   // ---------- tablar ----------
   function showTab(name) {
+    if (state.tab !== name && tabLeavers[state.tab]) tabLeavers[state.tab]();
     state.tab = name;
     $$(".tab").forEach((s) => s.classList.toggle("active", s.id === "tab-" + name));
     const navName = navParent[name] || name;
@@ -129,6 +131,7 @@ window.App = (function () {
     if (tg) name === "home" ? tg.BackButton.hide() : tg.BackButton.show();
   }
   function onTab(name, fn) { tabRenderers[name] = fn; }
+  function onLeaveTab(name, fn) { tabLeavers[name] = fn; }
 
   // ---------- Ta'lim (arab tili, suralar, video darslar) ----------
   // Uchala o'quv bo'limi bitta eshikda. Har birida hozirgi holat ko'rinadi —
@@ -156,6 +159,7 @@ window.App = (function () {
 
   // ---------- bugungi kartochka (bosh sahifa) ----------
   function renderToday() {
+    if (window.Qibla) Qibla.renderHero();   // hero'dagi kichik kompas — zikrdan mustaqil
     const el = $("#today-card");
     if (!window.Zikr) { el.innerHTML = ""; return; }
     const s = Zikr.summary();
@@ -186,6 +190,13 @@ window.App = (function () {
   function currentLng() {
     if (state.city === "gps" && state.geo) return state.geo.lng;
     return (D.cities.find((c) => c.name === state.city) || D.cities[0]).lng;
+  }
+  //  Qibla burchagi uchun kenglik ham kerak. currentLng() dan farqi shunda —
+  //  u faqat uzunlikni qaytaradi, chunki rasmiy namoz vaqti usuli kenglikni 41.31 deb oladi.
+  function coords() {
+    if (state.city === "gps" && state.geo) return { lat: state.geo.lat, lng: state.geo.lng, gps: true, name: "GPS" };
+    const c = D.cities.find((x) => x.name === state.city) || D.cities[0];
+    return { lat: c.lat, lng: c.lng, gps: false, name: c.name };
   }
   function loadPrayerTimes() {
     const now = new Date(), t = Vaqt.times(now, currentLng()), h = Vaqt.hijri(now);
@@ -236,7 +247,7 @@ window.App = (function () {
     const z = window.Zikr ? Zikr.summary() : { started: false };
     if (!z.started) return null;                 // dastur boshlanmagan — bu taklifni "Bugungi" kartochkasi qiladi
     const left = (type) => z.tasks.some((t) => t.type === type && !t.done);
-    if (s.now === "bomdod") return { key: "namoz", label: "Bomdod namozini o'qish", icon: "mosque", run: () => showTab("namoz") };
+    if (s.now === "bomdod") return { key: "namoz", label: "Bomdod namozini o'qish", icon: "mosque", run: () => showTab("qadam") };
     if (left("tong") && (s.next === "peshin" || s.now === "peshin" || s.now === "asr"))
       return { key: "tong", label: "Tongi zikrlarni o'qish", icon: "sunrise", run: () => Zikr.open("tong") };
     if (left("tun") && (s.now === "shom" || s.now === "xufton"))
@@ -281,6 +292,7 @@ window.App = (function () {
       state.city = "gps"; Store.set("city", "gps"); sel.value = "gps";
       if (!silent) notify("success");
       updateCityLabel(); loadPrayerTimes();
+      if (tabRenderers[state.tab]) tabRenderers[state.tab]();   // ochiq bo'lim yangi joyga moslansin
     };
     const fail = (why) => {
       if (silent) return;
@@ -349,23 +361,49 @@ window.App = (function () {
     else if (lastTimes) { if (Store.today() !== lastDay) loadPrayerTimes(); else startCountdown(); }
   });
 
+  // ---------- Namoz (tanlov ekrani) ----------
+  // Ta'lim bilan bir xil ko'rinish: qisqa ro'yxat, har qatorda hozirgi holat.
+  // «Namoz» tugmasi 13 qadamli ko'rsatmaning o'rtasiga emas, shu tanlovga olib keladi.
+  function renderNamozHub() {
+    const steps = D.namoz.steps.length;
+    const qazo = window.Qazo ? Qazo.summary() : null;
+    const lessons = window.Video ? PRAYER_LESSONS.reduce((n, id) => n + Video.countIn(id), 0) : 0;
+    const items = [
+      { tab: "qadam", icon: "mosque", tone: "t-green", title: "Bomdod — qadam-baqadam",
+        sub: state.step > 0 ? `${steps} qadam · ${state.step + 1}-qadamda to'xtagansiz` : `${steps} qadam · niyatdan salomgacha` },
+      { tab: "boshqa", icon: "video", tone: "t-gold", title: "Namoz video darslari",
+        sub: lessons ? `Har bir namoz uchun · ${lessons} ta dars` : "Darslar tayyorlanmoqda" },
+      { tab: "qazo", icon: "calendar", tone: "t-rose", title: "Qazo namozlar",
+        sub: qazo && qazo.left ? `${qazo.left} ta qoldi · kuniga ${qazo.plan} ta` : "O'tkazib yuborilgan namozlar hisobi" },
+    ];
+    $("#namoz-body").innerHTML = `<div class="list">${items.map((it) => `
+      <button class="menu-item" data-go="${it.tab}">
+        <span class="menu-icon ${it.tone}">${Icons.get(it.icon)}</span>
+        <span class="menu-text"><b>${esc(it.title)}</b><small>${esc(it.sub)}</small></span>
+        <span class="menu-arrow">${Icons.get("chevron")}</span>
+      </button>`).join("")}</div>`;
+    $$("#namoz-body [data-go]").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.go)));
+  }
+  tabRenderers.namoz = renderNamozHub;
+
   // ---------- qadam-baqadam ----------
-  function renderNamoz() {
-    $("#namoz-intro").innerHTML = `<p>${D.namoz.intro}</p>`;
+  function renderQadam() {
+    $("#namoz-intro").textContent = D.namoz.intro;
     $$("#rakat-seg .seg").forEach((b) => b.classList.toggle("active", b.dataset.rakat === state.rakat));
     $("#niyat-text").textContent = state.rakat === "sunnat" ? D.namoz.sunnatNiyat : D.namoz.farzNiyat;
     $("#namoz-after").innerHTML = `<div class="card-label">Namozdan so'ng</div><p>${D.namoz.after}</p>`;
-    renderOtherPrayers();
     renderStep();
   }
+  tabRenderers.qadam = renderQadam;
 
-  // Qadam-baqadam ko'rsatma bomdod uchun yozilgan. Qolgan namozlar video darslarda —
-  // shuning uchun ularga shu yerdan yo'l ochamiz, aks holda «ilovada yo'q» degan taassurot qoladi.
-  const OTHER_PRAYERS = ["peshin", "asr", "shom", "xufton", "juma"];
-  function renderOtherPrayers() {
+  // Har bir namozning video darsi. BOMDOD HAM shu yerda: uning qadam-baqadam ko'rsatmasi
+  // bo'lgani bilan video dars ham bor — ilgari bu ro'yxatdan tashqarida qolib, faqat
+  // Ta'lim ichidan topilardi va «nega bomdod yo'q?» degan savol tug'ilardi.
+  const PRAYER_LESSONS = ["bomdod", "peshin", "asr", "shom", "xufton", "juma", "nafl"];
+  function renderBoshqa() {
     const el = $("#namoz-others");
     if (!el) return;
-    const rows = OTHER_PRAYERS
+    const rows = PRAYER_LESSONS
       .map((id) => (D.videoSections || []).find((s) => s.id === id))
       .filter(Boolean)
       .map((s) => {
@@ -378,6 +416,7 @@ window.App = (function () {
     el.innerHTML = rows.join("");
     $$("#namoz-others [data-sec]").forEach((b) => b.addEventListener("click", () => { haptic(); if (window.Video) Video.open(b.dataset.sec); }));
   }
+  tabRenderers.boshqa = renderBoshqa;
   function renderStep() {
     const steps = D.namoz.steps, i = state.step, s = steps[i], g = state.gender || "erkak", note = s[g];
     let html = `<div class="step fade">
@@ -457,5 +496,5 @@ window.App = (function () {
 
   document.addEventListener("DOMContentLoaded", init);
 
-  return { $, $$, state, haptic, notify, esc, confirm: confirmDlg, showTab, onTab, openDetail, openDetailHtml, closeDetail, formatArabic, listItem, renderToday, ring };
+  return { $, $$, state, haptic, notify, esc, confirm: confirmDlg, showTab, onTab, onLeaveTab, coords, locate: locateAndLoad, openDetail, openDetailHtml, closeDetail, formatArabic, listItem, renderToday, ring };
 })();

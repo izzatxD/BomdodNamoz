@@ -130,22 +130,47 @@ window.Zikr = (function () {
           ${Icons.get("chevron")}</button>`; }).join("")}</div>`;
   }
 
+  // ---------- tugallanmagan sanoq ----------
+  //  Ba'zi zikrlar 100 marta o'qiladi. Ilgari sanoq faqat ochiq oynada yashardi:
+  //  90 marta bosib chiqib ketsangiz, hammasi yo'qolar va noldan boshlashga to'g'ri
+  //  kelardi. Endi bugungi sanoq saqlanadi. Ball hisobiga ta'sir qilmaydi —
+  //  alohida `zp` kalitida, faqat bugungi kun uchun.
+  let zpPending = null, zpTimer = 0;
+  function partialAll() { return zpPending || Store.get("zp", {}); }
+  function partialOf(id) { return (partialAll()[Store.today()] || {})[id] || 0; }
+  function setPartial(id, n) {
+    const td = Store.today(), cur = Object.assign({}, partialAll()[td] || {});
+    if (n > 0) cur[id] = n; else delete cur[id];
+    zpPending = {}; zpPending[td] = cur;          // faqat bugungi kun — kalit o'smasin
+    clearTimeout(zpTimer); zpTimer = setTimeout(flushPartial, 500);
+  }
+  function flushPartial() {
+    clearTimeout(zpTimer); zpTimer = 0;
+    if (!zpPending) return;
+    const v = zpPending; zpPending = null;
+    Store.set("zp", v);
+  }
+
   // ---------- zikr hisoblagichi (overlay) ----------
   function openZikr(k, i) {
     const list = Z[k], z = list[i], f = fullZikr(z);
-    let count = 0;
     const done = () => todayRec()[k].includes(z.id);
+    let count = done() ? z.count : Math.min(partialOf(z.id), z.count);
+    //  Doira ostidagi yozuv sanoq bilan birga o'zgaradi — aks holda «42 / 100» turib,
+    //  ostida ochilgan paytdagi «yana 70 marta» qotib qolardi
+    const hint = () => done() ? "Bugun bajarildi"
+      : count ? `Har o'qiganda bosing · yana ${z.count - count} marta` : "Har o'qiganda bosing";
     const html = () => `
       <div class="detail-title fade">${esc(f.title)}</div>
       <div class="detail-sub">${k === "tong" ? "Tong" : "Tun"} zikri · ${i + 1}/${list.length} · ${z.count} marta</div>
       ${f.arabic ? `<div class="arabic fade">${App.formatArabic(f.arabic)}</div>` : ""}
-      <div class="block"><div class="card-label">O'qilishi</div><div class="latin">${esc(f.latin || "")}</div></div>
-      <div class="block"><div class="card-label">Ma'nosi</div><div class="meaning">${esc(f.meaning || "")}</div></div>
+      ${f.latin ? `<div class="block"><div class="card-label">O'qilishi</div><div class="latin">${esc(f.latin)}</div></div>` : ""}
+      ${f.meaning ? `<div class="block"><div class="card-label">Ma'nosi</div><div class="meaning">${esc(f.meaning)}</div></div>` : ""}
       ${f.link ? `<div class="chips">${f.link.map((id) => { const s = D.suralar.find((x) => x.id === id); return s ? `<button class="chip-sm" data-sura="${id}">📖 ${s.title}</button>` : ""; }).join("")}</div>` : ""}
       ${f.fazilat ? `<div class="block fazilat"><div class="card-label">Fazilati</div><div class="small">${esc(f.fazilat)}</div></div>` : ""}
       <div class="counter-wrap">
-        ${counterHtml("zc", done() ? "✓" : count, z.count, done() ? 1 : 0, done())}
-        <p class="small muted" style="margin-top:10px">${done() ? "Bugun bajarildi" : "Har o'qiganda bosing"}</p>
+        ${counterHtml("zc", done() ? "✓" : count, z.count, done() ? 1 : count / z.count, done())}
+        <p class="small muted" style="margin-top:10px" id="zc-hint">${hint()}</p>
       </div>
       <div class="step-nav">
         <button class="btn ghost" id="zc-prev" ${i === 0 ? "disabled" : ""}>‹ Oldingi</button>
@@ -157,6 +182,8 @@ window.Zikr = (function () {
         if (done()) return;
         count++; haptic();
         $("#zc-num").textContent = count; setRing("zc", count / z.count);
+        $("#zc-hint").textContent = hint();
+        setPartial(z.id, count);
         if (count >= z.count) markDone(k, z.id);
       });
       $("#zc-prev").addEventListener("click", () => openZikr(k, i - 1));
@@ -166,6 +193,7 @@ window.Zikr = (function () {
     bindAll();
     function markDone(k, id) {
       const rec = todayRec(); if (!rec[k].includes(id)) rec[k].push(id); saveToday(rec);
+      setPartial(id, 0); flushPartial();   // tugadi — oraliq sanoq kerak emas
       notify("success");
       $("#zc-btn").classList.add("done"); $("#zc-num").textContent = "✓"; setRing("zc", 1);
       if (i < list.length - 1) setTimeout(() => openZikr(k, i + 1), 700);
@@ -188,47 +216,129 @@ window.Zikr = (function () {
   }
 
   // ---------- tasbih ----------
-  let tasbihId = Z.tasbih[0].id, tasbihCount = 0;
-  function renderTasbih() {
-    const z = Z.tasbih.find((x) => x.id === tasbihId), rec = days()[Store.today()] || { s: {} }, s = rec.s || {};
-    return `<div class="chips scroll">${Z.tasbih.map((t) => `<button class="chip-sm ${t.id === tasbihId ? "on" : ""}" data-tasbih="${t.id}">${esc(t.title)}${(s[t.id] || 0) >= t.target ? " ✓" : ""}</button>`).join("")}</div>
-      <div class="card tasbih-card">
-        <div class="arabic center">${z.arabic}</div>
-        <div class="muted small">${esc(z.meaning)}</div>
-        ${counterHtml("tb", tasbihCount, z.target, tasbihCount / z.target, false, true)}
-        <div class="row-center">
-          <button class="btn ghost" id="tb-reset">Tozalash</button>
-          <span class="muted small">Bugun jami: <b id="tb-today">${s[z.id] || 0}</b></span>
-        </div>
-      </div>
-      <div class="card"><div class="card-label">Bugungi natijalar</div><div id="tb-results">${tasbihResults(s)}</div></div>`;
+  //  Katta hisoblagich BUGUNGI natijani ko'rsatadi — pastdagi «Bugungi natijalar»
+  //  ro'yxatidagi raqam bilan aynan bir xil. Ilgari u faqat shu seansdagi bosishlarni
+  //  sanardi: boshqa zikrga o'tib qaytsangiz doira 0 ga tushar, ro'yxatda esa 33/33 ✓
+  //  turardi — bitta ekranda ikki xil javob.
+  let tasbihId = Z.tasbih[0].id;
+
+  //  Har bosishda bulutga yozish — 100 marta bosilganda 100 ta yozuv, Telegram
+  //  CloudStorage'ni bo'g'ib qo'yadi. Shuning uchun yozuv kechiktiriladi; ekran esa
+  //  darhol yangilanadi va oradagi qiymat `pending` da turadi.
+  let pending = null, saveTimer = 0;
+  function liveDays() { return pending || days(); }
+  function scheduleSave(d) {
+    pending = d;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushDays, 500);
   }
+  function flushDays() {
+    clearTimeout(saveTimer); saveTimer = 0;
+    if (!pending) return;
+    const d = pending; pending = null;
+    saveDays(d); syncDay();
+  }
+
+  function renderTasbih() {
+    const z = Z.tasbih.find((x) => x.id === tasbihId);
+    const s = (liveDays()[Store.today()] || {}).s || {};
+    const n = s[z.id] || 0, done = n >= z.target;
+    const i = Z.tasbih.findIndex((x) => x.id === tasbihId);
+    return `<div class="card tasbih-card">
+        <div class="arabic center">${App.formatArabic(z.arabic)}</div>
+        <div class="card-label">O'qilishi</div>
+        <div class="latin">${esc(z.latin || "")}</div>
+        <div class="card-label">Ma'nosi</div>
+        <div class="meaning">${esc(z.meaning || "")}</div>
+        ${counterHtml("tb", n, z.target, n / z.target, done, true)}
+        <p class="small ${done ? "ok-text" : "muted"}" style="margin:10px 0 0" id="tb-hint">${tasbihHint(n, z.target)}</p>
+        <div class="step-nav">
+          <button class="btn ghost" data-tbnav="-1" ${i === 0 ? "disabled" : ""}>‹ Oldingi</button>
+          <span class="step-counter">${i + 1} / ${Z.tasbih.length}</span>
+          <button class="btn ${done ? "primary" : "ghost"}" data-tbnav="1" ${i === Z.tasbih.length - 1 ? "disabled" : ""}>Keyingi ›</button>
+        </div>
+        <button class="btn ghost small-btn" id="tb-reset" ${n ? "" : "disabled"}>Bugungini tozalash</button>
+      </div>
+      <div class="card"><div class="card-label">Barcha zikrlar</div><div id="tb-results">${tasbihResults(s)}</div></div>`;
+  }
+  //  Doira ostidagi yozuv har bosishda yangilanadi — «28 / 100» turib, ostida
+  //  ochilgan paytdagi «Yana 100 marta» qotib qolmasin
+  function tasbihHint(n, target) {
+    return n >= target ? "Bugungi maqsad bajarildi ✓" : `Yana ${target - n} marta`;
+  }
+  //  Sakkizala zikr shu ro'yxatda ko'rinadi va shu yerdan tanlanadi. Ilgari tepada
+  //  yon tomonga suriladigan tugmalar qatori bor edi: 8 tadan 3 tasi ko'rinar,
+  //  qolganini surish kerakligini esa hech narsa aytmasdi.
   function tasbihResults(s) {
-    return Z.tasbih.map((t) => `<div class="row-between small"><span>${esc(t.title)}</span><b class="${(s[t.id] || 0) >= t.target ? "ok-text" : ""}">${s[t.id] || 0} / ${t.target}</b></div>`).join("");
+    return Z.tasbih.map((t, i) => {
+      const n = s[t.id] || 0, done = n >= t.target, cur = t.id === tasbihId;
+      return `<button class="tb-row ${done ? "done" : ""} ${cur ? "on" : ""}" data-tasbih="${t.id}">
+        <span class="tb-mark">${done ? Icons.get("check", 15) : i + 1}</span>
+        <span class="tb-name">${esc(t.title)}</span>
+        <span class="tb-num">${n} / ${t.target}</span></button>`;
+    }).join("");
   }
   function tasbihTap() {
     const z = Z.tasbih.find((x) => x.id === tasbihId);
-    tasbihCount++; haptic(tasbihCount % 33 === 0 ? "heavy" : "light");
-    const d = days(), td = Store.today(); d[td] = d[td] || { s: {} }; d[td].s = d[td].s || {};
-    d[td].s[z.id] = (d[td].s[z.id] || 0) + 1; saveDays(d); syncDay();
-    $("#tb-num").textContent = tasbihCount; $("#tb-today").textContent = d[td].s[z.id]; setRing("tb", tasbihCount / z.target);
+    const d = liveDays(), td = Store.today();
+    d[td] = d[td] || {}; d[td].s = d[td].s || {};
+    const n = (d[td].s[z.id] || 0) + 1;
+    d[td].s[z.id] = n;
+    haptic(n % 33 === 0 ? "heavy" : "light");
+    $("#tb-num").textContent = n; setRing("tb", n / z.target);
+    const h = $("#tb-hint");
+    h.textContent = tasbihHint(n, z.target);
+    h.className = "small " + (n >= z.target ? "ok-text" : "muted");
+    $("#tb-reset").disabled = false;
     $("#tb-results").innerHTML = tasbihResults(d[td].s);
-    if (tasbihCount === z.target) { notify("success"); $("#tb-btn").classList.add("done"); setTimeout(render, 600); }
+    scheduleSave(d);
+    if (n === z.target) { notify("success"); $("#tb-btn").classList.add("done"); setTimeout(render, 600); }
+  }
+  //  Zikr almashganda ekran tepasiga qaytamiz: tanlov pastdagi ro'yxatdan bo'lsa ham
+  //  yangi zikrning arabchasi va o'qilishi ko'z oldida bo'lsin
+  function selectTasbih(id) {
+    if (id === tasbihId) return;
+    tasbihId = id; haptic(); render();
+    try { window.scrollTo({ top: 0, behavior: "smooth" }); } catch (e) { window.scrollTo(0, 0); }
+  }
+  function stepTasbih(d) {
+    const i = Z.tasbih.findIndex((x) => x.id === tasbihId) + d;
+    if (i >= 0 && i < Z.tasbih.length) selectTasbih(Z.tasbih[i].id);
+  }
+  function tasbihReset() {
+    const z = Z.tasbih.find((x) => x.id === tasbihId);
+    const td = Store.today();
+    if (!((liveDays()[td] || {}).s || {})[z.id]) return;
+    App.confirm(`«${z.title}» bo'yicha bugungi hisob nolga tushsinmi?`, () => {
+      const d = liveDays();
+      if (d[td] && d[td].s) delete d[td].s[z.id];
+      pending = d; flushDays(); render();
+    });
   }
 
   // ---------- hodisalar ----------
   function bind(body) {
     body.querySelectorAll("[data-zikr]").forEach((b) => b.addEventListener("click", () => { const [k, i] = b.dataset.zikr.split(":"); openZikr(k, Number(i)); }));
     body.querySelectorAll("[data-goto]").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.goto; render(); }));
-    body.querySelectorAll("[data-tasbih]").forEach((b) => b.addEventListener("click", () => { tasbihId = b.dataset.tasbih; tasbihCount = 0; render(); }));
+    body.querySelectorAll("[data-tbnav]").forEach((b) => b.addEventListener("click", () => stepTasbih(Number(b.dataset.tbnav))));
+    // Ro'yxat ichi har bosishda qayta chiziladi — shuning uchun tinglovchi idishga qo'yiladi
+    const res = body.querySelector("#tb-results");
+    if (res) res.addEventListener("click", (e) => {
+      const row = e.target.closest("[data-tasbih]");
+      if (row) selectTasbih(row.dataset.tasbih);
+    });
     body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
       const a = b.dataset.act;
       if (a === "start") { Store.set("habit", { start: Store.today() }); notify("success"); syncDay(); render(); }
       if (a === "restart") App.confirm("Dasturni 1-kundan qayta boshlaysizmi?", () => { Store.set("habit", { start: Store.today() }); syncDay(); render(); });
-      if (a === "reset-tong" || a === "reset-tun") { const r = todayRec(); r[a.slice(6)] = []; saveToday(r); render(); }
+      if (a === "reset-tong" || a === "reset-tun") {
+        const k = a.slice(6), r = todayRec(); r[k] = []; saveToday(r);
+        Z[k].forEach((z) => setPartial(z.id, 0));   // tugallanmagan sanoqlar ham tozalansin
+        flushPartial(); render();
+      }
     }));
     const tb = body.querySelector("#tb-btn"); if (tb) tb.addEventListener("click", tasbihTap);
-    const tr = body.querySelector("#tb-reset"); if (tr) tr.addEventListener("click", () => { tasbihCount = 0; render(); });
+    const tr = body.querySelector("#tb-reset"); if (tr) tr.addEventListener("click", tasbihReset);
   }
 
   // Bosh sahifadagi «hozir nima qilay» tugmasi kerakli bo'limni shu orqali ochadi
@@ -237,7 +347,12 @@ window.Zikr = (function () {
     App.showTab("zikr");
   }
 
-  $$("#zikr-seg .seg").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.kind; render(); }));
+  //  Kechiktirilgan yozuvlar yo'qolib qolmasin: bo'lim almashganda, Zikrlardan
+  //  chiqilganda va ilova fonga o'tganda darhol saqlanadi
+  function flushAll() { flushDays(); flushPartial(); }
+  $$("#zikr-seg .seg").forEach((b) => b.addEventListener("click", () => { kind = b.dataset.kind; flushAll(); render(); }));
   App.onTab("zikr", render);
+  App.onLeaveTab("zikr", flushAll);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) flushAll(); });
   return { summary, render, open };
 })();

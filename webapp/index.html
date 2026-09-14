@@ -53,8 +53,13 @@
           <select id="city-select" class="city-select-hidden"></select>
         </div>
         <div class="hero-count" id="hero-count-box">
-          <div class="hero-count-label" id="next-label">Keyingi namoz</div>
-          <div class="hero-count-val" id="countdown"><span class="skeleton w160"></span></div>
+          <div class="hero-count-main">
+            <div class="hero-count-label" id="next-label">Keyingi namoz</div>
+            <div class="hero-count-val" id="countdown"><span class="skeleton w160"></span></div>
+          </div>
+          <!-- Qibla kompasi shu yerda: namozdan oldin kerak bo'ladigan yagona narsa.
+               Chizmani qibla.js chizadi va telefon burilganda aylantirib turadi. -->
+          <button class="hero-qibla hidden" id="hero-qibla" aria-label="Qibla"></button>
         </div>
         <div class="hero-all" id="times-all"></div>
         <!-- «Hozir nima qilay?» — vaqtga va bugun bajarilganiga qarab (app.js → nextAction) -->
@@ -82,9 +87,15 @@
       </div>
     </section>
 
-    <!-- ================= NAMOZ ================= -->
-    <section id="tab-namoz" class="screen tab">
-      <div class="card intro-card" id="namoz-intro"></div>
+    <!-- ================= NAMOZ — tanlov ekrani =================
+         Pastdagi «Namoz» tugmasi 13 qadamli ko'rsatmaning o'rtasiga emas, TANLOVGA olib keladi:
+         qaysi namoz kerak — bomdodmi, boshqasimi, qazomi. Ta'lim ham xuddi shunday ro'yxat. -->
+    <section id="tab-namoz" class="screen tab"><div id="namoz-body"></div></section>
+
+    <!-- ================= BOMDOD — QADAM-BAQADAM =================
+         Alohida, toza ekran: faqat ko'rsatma. Havolalar va qazo bu yerga aralashmaydi. -->
+    <section id="tab-qadam" class="screen tab">
+      <p class="small muted" id="namoz-intro" style="margin:0 0 12px"></p>
       <div class="segmented" id="rakat-seg">
         <button class="seg active" data-rakat="sunnat">2 rakat sunnat</button>
         <button class="seg" data-rakat="farz">2 rakat farz</button>
@@ -98,10 +109,13 @@
         <button class="btn primary" id="step-next">Keyingi <i data-icon="chevron" data-size="18"></i></button>
       </div>
       <div class="card" id="namoz-after"></div>
-      <button class="menu-item" data-go="qazo"><span class="menu-icon t-rose"><i data-icon="calendar"></i></span><span class="menu-text"><b>Qazo namozlar</b><small>O'tkazib yuborilgan namozlar hisobi</small></span><i data-icon="chevron" class="menu-arrow"></i></button>
-      <!-- Qadam-baqadam ko'rsatma faqat bomdod uchun. Qolgan namozlar video darslarda —
-           foydalanuvchi bu yerda ular yo'q deb o'ylab qolmasin (app.js → renderOtherPrayers). -->
-      <div class="section-head"><h2 class="section-title">Boshqa namozlar</h2></div>
+    </section>
+
+    <!-- ================= NAMOZ VIDEO DARSLARI =================
+         Har bir namozning video darsi bitta joyda — bomdodniki ham (app.js → renderBoshqa).
+         Bomdodning qadam-baqadam ko'rsatmasi alohida; bu yerda uni ko'rib ham o'rganish mumkin. -->
+    <section id="tab-boshqa" class="screen tab">
+      <p class="small muted" style="margin:0 0 12px">Har bir namoz uchun video dars. Tartib hamma namozda bir xil — rakatlar soni va ba'zi duolar farq qiladi.</p>
       <div class="list" id="namoz-others"></div>
     </section>
 
@@ -137,6 +151,9 @@
       </div>
       <button class="btn ghost wide danger" id="qazo-reset">Hisobni tozalash</button>
     </section>
+
+    <!-- ================= QIBLA ================= -->
+    <section id="tab-qibla" class="screen tab"><div id="qibla-body"></div></section>
 
     <!-- ================= ZIKR ================= -->
     <section id="tab-zikr" class="screen tab">
@@ -204,6 +221,7 @@
   <script src="zikr.js"></script>
   <script src="arabic.js"></script>
   <script src="qazo.js"></script>
+  <script src="qibla.js"></script>
   <script src="nur.js"></script>
   <script src="api.js"></script>
   <script src="reyting.js"></script>

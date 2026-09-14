@@ -22,11 +22,17 @@ jobs:
       - name: Saqlash (CloudStorage 4KB bo'linishi)
         run: node test/store.test.js
 
-      - name: Ball tizimi (chegaralar, balans, streak, darajalar)
+      - name: Ball tizimi va zikr matnlari
         run: node test/nur.test.js
 
-      - name: Ilova ↔ bot mosligi (CAP, darajalar, bo'limlar, shaharlar, formula)
+      - name: Ilova ↔ bot mosligi va navigatsiya
         run: node test/sync.test.js
+
+      - name: Qibla (burchak, masofa, kompas o'qishi)
+        run: node test/qibla.test.js
+
+      - name: Admin paneli (raqamlar eskirmasligi)
+        run: node test/admin.test.js
 
       - uses: actions/setup-python@v5
         with:

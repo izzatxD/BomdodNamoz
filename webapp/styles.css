@@ -286,6 +286,26 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .counter.bump .counter-inner { animation: bump .18s; }
 @keyframes bump { 50% { transform: scale(1.04); } }
 .tasbih-card { text-align: center; }
+/* Arabcha → o'qilishi → ma'nosi: uchtasi uch pog'onada, qaysi biri nimaligi ko'rinib tursin */
+.tasbih-card .card-label { margin: 14px 0 3px; }
+.tasbih-card .latin { font-size: 17px; font-weight: 700; line-height: 1.5; }
+.tasbih-card .meaning { font-size: 14px; }
+.tasbih-card .counter { margin-top: 18px; }
+.tasbih-card .step-nav { margin: 16px 0 10px; }
+.tasbih-card .small-btn { width: auto; margin: 0 auto; display: block; }
+
+/* Tasbih zikrlari ro'yxati — bu ham natija ko'rsatadi, ham tanlov qiladi */
+.tb-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 2px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; border-radius: 10px; transition: background .15s; }
+.tb-row:last-of-type { border-bottom: 0; }
+.tb-row:active { background: var(--surface-2); }
+.tb-mark { width: 26px; height: 26px; border-radius: 9px; border: 2px solid var(--line); display: grid; place-items: center; flex-shrink: 0; font-size: 12px; font-weight: 800; color: var(--muted); }
+.tb-row.done .tb-mark { background: var(--primary); border-color: var(--primary); color: #fff; }
+.tb-row.on .tb-mark { border-color: var(--primary); color: var(--primary); }
+.tb-row.on.done .tb-mark { color: #fff; }
+.tb-name { flex: 1; font-weight: 600; min-width: 0; }
+.tb-row.on .tb-name { color: var(--primary); font-weight: 800; }
+.tb-num { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 13.5px; white-space: nowrap; }
+.tb-row.done .tb-num { color: var(--primary); font-weight: 700; }
 .arabic.center { text-align: center; direction: rtl; padding: 12px; margin-bottom: 4px; border-top: 0; }
 
 /* ---------- arab tili ---------- */
@@ -505,7 +525,8 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 
 /* ---------- hero: barcha namoz vaqtlari ---------- */
 /* keyingi namozgacha jonli sanoq */
-.hero-count { margin-top: 14px; }
+.hero-count { margin-top: 14px; display: flex; align-items: center; gap: 12px; }
+.hero-count-main { flex: 1; min-width: 0; }
 .hero-count-label { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .85; font-weight: 700; }
 .hero-count-val { font-size: 46px; font-weight: 800; line-height: 1.05; letter-spacing: -.02em; font-variant-numeric: tabular-nums; margin: 3px 0 0; }
 .hero-count.live .hero-count-label::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #7CFFC4; margin-right: 7px; vertical-align: middle; animation: pulse 1.6s infinite; }
@@ -543,3 +564,67 @@ h1, h2, h3 { margin: 0; letter-spacing: -.01em; }
 .bars.dense .bar-col { padding: 0; gap: 0; border-radius: 3px; }
 .bars-axis { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); font-weight: 700; margin-top: 6px; }
 .admin-actions { margin-top: 4px; }
+/* ---------- qibla kompasi ---------- */
+.q-card { padding: 18px 16px 16px; }
+.q-wrap { display: grid; place-items: center; }
+.q-svg { width: min(320px, 76vw); height: auto; display: block; overflow: visible; }
+
+/* doira */
+.q-face { fill: var(--surface-2); }
+.q-rim { fill: none; stroke: var(--line); stroke-width: 2; }
+.q-hub { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
+.q-head { fill: var(--ink); font-size: 25px; font-weight: 800; text-anchor: middle; font-variant-numeric: tabular-nums; }
+.q-head-lbl { fill: var(--muted); font-size: 9.5px; font-weight: 700; text-anchor: middle; letter-spacing: .08em; text-transform: uppercase; }
+
+/* bo'linmalar va tomonlar */
+.q-tick { stroke: var(--line); stroke-width: 1.5; stroke-linecap: round; }
+.q-tick.maj { stroke: var(--muted); stroke-width: 2.4; }
+.q-dir { fill: var(--muted); font-size: 11px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+.q-dir.n { fill: var(--ink); }
+
+/* qibla yo'nalishi */
+.q-cone { fill: var(--gold); opacity: .16; }
+.q-ray { stroke: var(--gold); stroke-width: 2.5; stroke-linecap: round; stroke-dasharray: 5 6; opacity: .75; }
+.q-kaaba-bg { fill: var(--gold); }
+.q-kaaba { color: #fff; }
+
+/* siz qarab turgan tomon — doiradan tashqarida, qimirlamaydi */
+.q-you { fill: var(--muted); }
+.q-axis { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 5; opacity: .5; }
+
+/* qibla topilganda butun kompas jonlanadi */
+.q-wrap.on .q-face { fill: var(--primary-soft); }
+.q-wrap.on .q-rim { stroke: var(--primary); stroke-width: 3; }
+.q-wrap.on .q-you, .q-wrap.on .q-axis { stroke: var(--primary); fill: var(--primary); opacity: 1; }
+.q-wrap.on .q-cone { fill: var(--primary); opacity: .2; }
+.q-wrap.on .q-ray { stroke: var(--primary); stroke-dasharray: none; opacity: 1; }
+.q-wrap.on .q-kaaba-bg { fill: var(--primary); animation: qPulse 1.4s ease-out infinite; }
+@keyframes qPulse { 0% { r: 17; } 55% { r: 20; } 100% { r: 17; } }
+
+/* holat satri */
+.q-status { margin: 14px 0 0; text-align: center; font-size: 15px; font-weight: 700; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.q-status.on { color: var(--primary); }
+.q-status.on::before { content: "✓ "; }
+.q-manual { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; padding: 12px; border-radius: var(--r-sm); background: var(--surface-2); color: var(--ink-2); }
+.q-manual p { margin: 0; }
+.q-manual .ic { color: var(--muted); margin-top: 1px; }
+.q-tips { margin: 0; padding-left: 18px; color: var(--ink-2); font-size: 13.5px; }
+.q-tips li { margin-bottom: 6px; }
+.q-tips li:last-child { margin-bottom: 0; }
+/* ---------- hero ichidagi kichik qibla kompasi ---------- */
+.hero-qibla { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 3px; color: #fff; transition: transform .12s; }
+.hero-qibla:active { transform: scale(.93); }
+.hq-svg { width: 54px; height: 54px; display: block; overflow: visible; }
+.hq-face { fill: rgba(255,255,255,.14); }
+.hq-rim { fill: none; stroke: rgba(255,255,255,.34); stroke-width: 2.5; }
+.hq-stem { stroke: #FFD75E; stroke-width: 3.5; stroke-linecap: round; }
+.hq-head { fill: #FFD75E; }
+.hq-you { fill: rgba(255,255,255,.9); }
+.hq-n { fill: rgba(255,255,255,.85); font-size: 13px; font-weight: 800; text-anchor: middle; }
+.hq-label { font-size: 10.5px; font-weight: 700; opacity: .85; white-space: nowrap; }
+/* qibla topilganda — hero'dagi «jonli» nuqta bilan bir xil yashil */
+.hero-qibla.on .hq-face { fill: rgba(124,255,196,.22); }
+.hero-qibla.on .hq-rim { stroke: #7CFFC4; }
+.hero-qibla.on .hq-stem { stroke: #7CFFC4; }
+.hero-qibla.on .hq-head, .hero-qibla.on .hq-you { fill: #7CFFC4; }
+.hero-qibla.on .hq-label { opacity: 1; color: #7CFFC4; }

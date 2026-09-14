@@ -10,7 +10,10 @@ window.Admin = (function () {
   const MONTHS = ["yan", "fev", "mar", "apr", "may", "iyn", "iyl", "avg", "sen", "okt", "noy", "dek"];
   const METRICS = { dau: "Faol", new: "Yangi", nur: "Nur" };
   const METRIC_TITLE = { dau: "kunlik faol foydalanuvchilar", new: "yangi qo'shilganlar", nur: "jamiyat Nur'i" };
-  let data = null, loading = false, metric = "dau";
+  let data = null, loading = false, metric = "dau", loadedAt = 0, triedAt = 0, err = null;
+  // Telegram Mini App yopilganda uni xotirada saqlaydi — qaytib ochilganda sahifa QAYTA
+  // YUKLANMAYDI. Shuning uchun raqamlar o'z-o'zidan eskiradi: MAX_AGE dan oshsa qayta so'raladi.
+  const MAX_AGE = 45000;
 
   function isAdmin() { return !!(Api.meta && Api.meta.isAdmin); }
   function fmt(n) { return String(Math.round(n || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
@@ -29,12 +32,18 @@ window.Admin = (function () {
     if (tg && tg.openTelegramLink) tg.openTelegramLink(url); else window.open(url, "_blank");
   }
 
-  async function load() {
+  //  force — «Yangilash» tugmasi. Aks holda MAX_AGE ichida takror so'ralmaydi
+  //  (render/renderHome har chaqirilganda so'rov ketmasin).
+  //  Tarmoq uzilsa eski raqamlar saqlanadi — bir marta ulanmagani butun sahifani o'chirmasin.
+  async function load(force) {
     if (!Api.enabled || loading) return;
+    if (!force && Date.now() - triedAt < MAX_AGE) return;
+    triedAt = Date.now();
     loading = true;
     const r = await Api.adminStats();
     loading = false;
-    data = r && r.ok ? r : { error: (r && r.error) || "network" };
+    if (r && r.ok) { data = r; loadedAt = Date.now(); err = null; }
+    else err = (r && r.error) || "network";
     render();
     renderHome();
   }
@@ -44,9 +53,9 @@ window.Admin = (function () {
     const body = $("#admin-body");
     if (!body) return;
     if (!isAdmin()) { body.innerHTML = guard(); return; }
+    if (!data && err) { body.innerHTML = errorCard(); bind(body); return; }
     if (!data) { body.innerHTML = `<div class="card center" style="padding:28px"><span class="spinner"></span></div>`; load(); return; }
-    if (data.error) { body.innerHTML = errorCard(); bind(body); return; }
-    body.innerHTML = hero() + chart() + nurCard() + levels() + server() + actions();
+    body.innerHTML = hero() + chart() + nurCard() + levels() + server() + freshness() + actions();
     bind(body);
   }
 
@@ -55,7 +64,7 @@ window.Admin = (function () {
       <h3>Faqat adminlar uchun</h3><p class="small muted">Bu bo'lim ADMIN_IDS ro'yxatidagi foydalanuvchilarga ochiq.</p></div>`;
   }
   function errorCard() {
-    return `<div class="card center"><p class="small muted">${data.error === "forbidden" ? "Ruxsat yo'q." : "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring."}</p>
+    return `<div class="card center"><p class="small muted">${err === "forbidden" ? "Ruxsat yo'q." : "Serverga ulanib bo'lmadi. Internetni tekshirib, qayta urinib ko'ring."}</p>
       <button class="btn ghost small-btn" data-act="reload">Qayta urinish</button></div>`;
   }
 
@@ -129,18 +138,26 @@ window.Admin = (function () {
     <p class="small muted center" style="margin-top:12px">Bu sahifada faqat yig'indilar ko'rinadi — hech kimning shaxsiy natijasi emas.</p>`;
   }
 
+  //  «Raqam o'zgarmayapti» degan shubha qolmasin — qachon olingani yozib turiladi.
+  function freshness() {
+    const s = Math.max(0, Math.round((Date.now() - loadedAt) / 1000));
+    const when = s < 60 ? "hozirgina" : s < 3600 ? `${Math.floor(s / 60)} daqiqa oldin` : `${Math.floor(s / 3600)} soat oldin`;
+    return `<p class="small muted center" style="margin:12px 0 0">Raqamlar ${when} olindi${
+      err ? ` · <b class="danger">so'nggi yangilash o'tmadi</b>` : ""}</p>`;
+  }
+
   // ---------- bosh sahifadagi kartochka ----------
   function renderHome() {
     const el = $("#admin-card");
     if (!el) return;
     if (!isAdmin()) { el.classList.add("hidden"); return; }
     el.classList.remove("hidden");
-    const sub = data && !data.error ? `${fmt(data.users)} foydalanuvchi · ${fmt(data.dau)} bugun faol` : "Statistika, server holati, e'lon";
+    const sub = data ? `${fmt(data.users)} foydalanuvchi · ${fmt(data.dau)} bugun faol` : "Statistika, server holati, e'lon";
     el.innerHTML = `<span class="tile-icon t-blue" style="margin:0">${Icons.get("shield")}</span><div class="today-body">
       <div class="today-head"><b>Admin panel</b></div><p class="small muted" style="margin:0">${sub}</p></div>
       <span class="menu-arrow">${Icons.get("chevron")}</span>`;
     el.onclick = () => { haptic(); App.showTab("admin"); };
-    if (!data && !loading) load();   // kartochkada raqam ko'rinsin
+    load();   // kartochkadagi raqam eskirgan bo'lsa jimgina yangilanadi (load o'zi chegaralaydi)
   }
 
   // ---------- hodisalar ----------
@@ -148,14 +165,17 @@ window.Admin = (function () {
     body.querySelectorAll("[data-metric]").forEach((b) => b.addEventListener("click", () => { metric = b.dataset.metric; haptic(); render(); }));
     body.querySelectorAll("[data-act]").forEach((b) => b.addEventListener("click", () => {
       const a = b.dataset.act; haptic();
-      if (a === "reload") { data = null; render(); }
+      if (a === "reload") { err = null; render(); load(true); }   // render — kutish belgisi ko'rinsin
       else if (a === "video") App.showTab("video");
       else if (a === "xabar") openBot("xabar");
       else openBot("admin");   // pdf, backup — bot ko'rsatma beradi
     }));
   }
 
-  App.onTab("admin", () => { render(); if (data && !data.error) load(); });   // ochilganda fonda yangilanadi
+  App.onTab("admin", () => { render(); load(); });   // ochilganda fonda yangilanadi
   Api.onSync(() => { renderHome(); if (App.state.tab === "admin") render(); });
+  // Telegram Mini App'ni yopganda o'chirmaydi — keyin ochilganda `load` boshqa chaqirilmas edi
+  // va kartochkada bir necha kun oldingi raqam turib qolardi. Ko'rinishga qaytganda yangilaymiz.
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) renderHome(); });
   return { render, renderHome, load };
 })();

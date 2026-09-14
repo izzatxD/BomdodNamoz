@@ -15,6 +15,7 @@ bomdodnamozappbot/
 │   ├── zikr.js           ← tongi/tungi zikrlar, tasbih, 30 kunlik odat dasturi
 │   ├── arabic.js         ← arab tili darslari va testlar
 │   ├── qazo.js           ← qazo namozlar hisobi
+│   ├── qibla.js          ← qibla kompasi: burchak hisobi + qurilma kompasi
 │   ├── nur.js            ← Nur ballari, darajalar, nishonlar (serversiz ishlaydi)
 │   ├── api.js            ← reyting serveri bilan aloqa (apiUrl bo'sh bo'lsa — o'chiq)
 │   ├── reyting.js        ← Reyting ekrani: natijalarim, liga, jamoa, do'stlar
@@ -33,28 +34,44 @@ bomdodnamozappbot/
 │   └── .env.example
 ├── test/                 ← sinovlar (tashqi kutubxonasiz, CI da avtomatik ishlaydi)
 │   ├── store.test.js     ← ma'lumot yo'qolmasligi
-│   ├── nur.test.js       ← ball tizimi va balansi
-│   └── sync.test.js      ← ilova ↔ bot mosligi (takrorlangan ro'yxatlar ajralib ketmasin)
+│   ├── nur.test.js       ← ball tizimi, balansi va zikr matnlarining to'liqligi
+│   ├── sync.test.js      ← ilova ↔ bot mosligi + navigatsiya (ekran va «otasi» joyidami)
+│   ├── qibla.test.js     ← qibla burchagi va kompas o'qishi
+│   └── admin.test.js     ← admin paneli raqamlari eskirmasligi
 └── README.md
 ```
 
 ## Mini App imkoniyatlari
 
 **Navigatsiya.** Pastda 5 ta manzil: **Bosh · Namoz · Zikr · Ta'lim · Reyting**.
-Qolgan ekranlar shularning ichida yashaydi — Qazo → Namoz; Arab tili, Suralar, Video → Ta'lim
-(`app.js` dagi `navParent`). Shuning uchun istalgan ekranda pastda qaysi bo'limdaligingiz yonib turadi,
-orqaga tugmasi ham bir pog'ona yuqoriga olib chiqadi. Bosh sahifadagi kartochkalar — tezkor yo'llar.
+Qolgan ekranlar shularning ichida yashaydi — Bomdod qadamlari, Namoz video darslari va Qazo → Namoz;
+Arab tili, Suralar, Video → Ta'lim; Qibla → Bosh (`app.js` dagi `navParent`). Shuning uchun istalgan
+ekranda pastda qaysi bo'limdaligingiz yonib turadi, orqaga tugmasi ham bir pog'ona yuqoriga olib chiqadi.
+
+**Namoz va Ta'lim — bir xil mantiqda.** Ikkalasi ham TANLOV ekrani: qisqa ro'yxat, har qatorda hozirgi
+holat ko'rinadi (nechanchi qadamda to'xtagansiz, nechta qazo qoldi, nechta dars tugadi). Pastdagi
+«Namoz» tugmasi 13 qadamli ko'rsatmaning o'rtasiga emas, shu tanlovga olib keladi — ko'rsatma esa
+alohida, toza ekranda ochiladi. `test/sync.test.js` har bir ekranning `<section>` i va «ota» ekrani
+joyidaligini tekshiradi — yangi bo'lim qo'shilganda bo'sh ekran chiqib qolmasin.
 
 - Bosh sahifada erkak / ayol tanlanadi (keyin eslab qoladi, chip orqali almashtirish mumkin)
 - **«Hozir nima qilay?»** — hero ichida bitta tugma, vaqtga qarab o'zgaradi: bomdod vaqtida «Bomdod namozini
   o'qish», quyoshdan keyin «Tongi zikrlar», shomdan keyin «Tungi zikrlar», hammasi bajarilsa — tinch tasdiq.
   Bajarilgan ish qayta taklif qilinmaydi
-- **Namoz qadam-baqadam**: 13 ta qadam, har birida erkak va ayol uchun farqlar alohida; sunnat / farz niyati.
-  Qadam-baqadam ko'rsatma **bomdod** uchun yozilgan (sarlavhada shunday deb turadi) — shu sahifaning oxirida
-  peshin, asr, shom, xufton va jumaning **video darslariga** o'tish ro'yxati bor
-- **Zikrlar**
-  - 🌅 Tong (14 ta) va 🌙 Tun (15 ta) zikrlari — har biri hisoblagich bilan: bosib sanaysiz, sanoq to'lganda avtomatik keyingisiga o'tadi
-  - 📿 Tasbih — 8 xil zikr, katta tugma, kunlik natijalar
+- **Namoz** — uchta yo'l: **Bomdod qadamlari** (13 ta qadam, har birida erkak va ayol uchun farqlar alohida;
+  sunnat / farz niyati), **Namoz video darslari** va **Qazo**.
+  Video darslar ro'yxatida **bomdod ham bor** — kimdir o'qib emas, ko'rib o'rganishni afzal ko'radi.
+  Qadam-baqadam yozma ko'rsatma esa faqat bomdod uchun yozilgan
+- **Zikrlar** — har bir zikrda uchtasi ham bor: **arabcha**, **o'qilishi** (lotincha) va **ma'nosi**.
+  Arabchani hamma ham o'qiy olmaydi, shuning uchun o'qilishisiz zikr ilovada bo'lmaydi —
+  buni `test/nur.test.js` tekshirib turadi
+  - 🌅 Tong (14 ta) va 🌙 Tun (15 ta) zikrlari — har biri hisoblagich bilan: bosib sanaysiz, sanoq to'lganda avtomatik keyingisiga o'tadi.
+    100 marta o'qiladigan zikrni yarmida qoldirsangiz, **sanoq saqlanadi** — qaytib kirganda o'sha yerdan davom etasiz
+  - 📿 Tasbih — 8 xil zikr, katta tugma. Hisoblagich **bugungi** natijani ko'rsatadi, ya'ni pastdagi
+    «Barcha zikrlar» ro'yxatidagi raqam bilan aynan bir xil. Zikrlar orasida **«‹ Oldingi · 2/8 · Keyingi ›»**
+    bilan yoki ro'yxatdan to'g'ridan-to'g'ri o'tiladi — sakkizalasi bir ekranda, har birida bugungi natija.
+    (Ilgari tepada yon tomonga suriladigan tugmalar qatori bor edi: 8 tadan 3 tasi ko'rinar, qolganini
+    surish kerakligini esa hech narsa aytmasdi)
   - 🌱 **30 kunlik odat dasturi** — 4 hafta, yuk sekin oshadi (1-hafta: 3 ta zikr + 33 tasbih … 4-hafta: to'liq). Kunlik vazifalar avtomatik belgilanadi, 🔥 streak, 30 kunlik nuqtali xarita
 - **Arab tili** — 28 harf (4 shakli, misol so'z bilan), 11 ta dars: alifbo → harakatlar → tanvin → sukun/shadda → madd → quyoshiy/oyiy harflar → Fotiha, Ixlos, Kavsarni o'qish mashqi. Har darsda test, 80%+ bo'lsa keyingi dars ochiladi
 - **Qazo namozlar** — 6 namoz bo'yicha hisob (+/−), yil/oy/kun bo'yicha hisoblash yordamchisi, kunlik reja va "qachon tugaydi" prognozi, qazo niyati matni
@@ -71,6 +88,10 @@ orqaga tugmasi ham bir pog'ona yuqoriga olib chiqadi. Bosh sahifadagi kartochkal
   (4 shakli bilan) va 3 ta misol so'z chiqadi; dars tugaganda arab tili darslari bilan bir xil Nur beriladi
 - **Namoz vaqtlari** — 6 ta vaqt va hijriy sana. **GPS** bo'yicha yoki 13 ta shahardan. Ilovaning o'zida,
   O'zbekiston musulmonlari idorasi usuli bilan hisoblanadi — internet kerak emas, rasmiy taqvim bilan 99.7% mos
+- **Qibla kompasi** — **bosh sahifada, sanoq yonida**: kichik doira telefon bilan birga aylanadi,
+  qibla topilganda yashil bo'lib «Qibla ✓» deb yozadi. Bosilsa to'liq kompas ochiladi — katta doira,
+  tomon nomlari, Makkagacha masofa va «qancha burilish kerak» ko'rsatmasi. Kompas datchigi yo'q
+  qurilmada burchak raqam bilan ko'rsatiladi (masalan, Toshkentda shimoldan **240°**)
 - **Reyting (Nur)** — zikr, tasbih, qazo, dars va kunlik vazifalar uchun ball. Kunlik chegaralar:
   kunlik vazifalar 200 (eng katta — odatni o'sha shakllantiradi), tasbih 150, qazo 150, ilm 120, zikr 118 — jami 738.
   Daraja (Sham → Chiroq → Mash'al → Yulduz → Oy → Quyosh), 12 ta nishon, haftalik ustunli grafik.
@@ -322,6 +343,32 @@ Bot buyruqlari: `/start`, `/app`, `/vaqt Samarqand`, `/eslatma`, `/reyting`, `/j
 so'rovlar foydalanuvchi soniga bog'liq emas. Railway Hobby ($5/oy, ichida $5 kredit) — bu bot oyiga ~$1–3 ishlatadi.
 Haqiqiy bepul kerak bo'lsa — Oracle Cloud Always Free VM (o'zingiz boshqarasiz); Render free yaramaydi (bot uxlab qoladi, disk yo'q).
 
+## Qibla
+
+Burchak **ilovaning o'zida** hisoblanadi (`webapp/qibla.js`), internet kerak emas.
+
+Formula — **katta doira (great-circle) boshlang'ich azimuti**: yer shari bo'ylab Ka'baga
+(21.4225°N, 39.8262°E) eng qisqa yo'l qaysi tomonga ketishini beradi. Bu tekis xaritadagi to'g'ri
+chiziq EMAS — shuning uchun Toshkentdan qibla **240°** (janubi-g'arb), garchi xaritada Makka deyarli
+to'g'ri g'arbda ko'rinsa ham. Tekshiruv: Istanbul 151.6°, London 119.0°, Jakarta 295.2°, Nyu-York 58.5° —
+hammasi e'lon qilingan qiymatlar bilan 0.1 daraja ichida mos (`test/qibla.test.js`).
+
+Joylashuv namoz vaqtlari bilan bir manbadan olinadi: GPS yoqilgan bo'lsa o'zingiz turgan joy, aks holda
+tanlangan shahar. Namoz vaqti uchun faqat uzunlik kerak edi — qibla uchun **kenglik ham** ishlatiladi
+(`App.coords()`), shuning uchun GPS bilan natija aniqroq bo'ladi.
+
+Kompas o'qishi qurilmadan keladi va ikki platformada ikki xil:
+
+| Platforma | Manba | Izoh |
+|---|---|---|
+| iOS | `webkitCompassHeading` | tayyor qiymat; iOS 13+ da foydalanuvchi **ruxsat berishi** kerak — «Kompasni yoqish» tugmasi shuning uchun chiqadi |
+| Android | `deviceorientationabsolute.alpha` | teskari yo'nalishda o'lchanadi, `360 − alpha` qilinadi; ekran yon burilsa `screen.orientation.angle` qo'shiladi |
+
+Qurilmada datchik umuman bo'lmasa yoki undan 2.5 soniya ichida xabar kelmasa — **qo'l rejimi**: doira qimirlamaydi, shimol tepada turadi
+va Ka'ba belgisi burchakni ko'rsatadi. Magnit kompas temir va elektronika yonida adashadi, shuning uchun
+sahifada uni qanday to'g'ri ushlash haqida eslatma bor. Bo'limdan chiqilganda datchik **o'chiriladi**
+(`App.onLeaveTab`) — fonda batareya yemasin.
+
 ## Reyting va maxfiylik
 
 Reytingsiz ham ilova to'liq ishlaydi — Nur, daraja va nishonlar telefonning o'zida hisoblanadi.
@@ -350,11 +397,13 @@ Musobaqa (liga, jamoa, do'stlar) server ulanganda yonadi — yuqoridagi **«Inte
 
 ```bash
 node test/store.test.js    # ma'lumot yo'qolmasligi (CloudStorage 4KB bo'linishi)
-node test/nur.test.js      # ball tizimi: chegaralar, balans, streak, darajalar
-node test/sync.test.js     # ilova ↔ bot mosligi (CAP, darajalar, bo'limlar, shaharlar, formula)
+node test/nur.test.js      # ball tizimi: chegaralar, balans, streak, darajalar + zikr matnlari
+node test/sync.test.js     # ilova ↔ bot mosligi (CAP, darajalar, shaharlar, formula) + navigatsiya
+node test/qibla.test.js    # qibla burchagi, masofa va kompas o'qishi (iOS/Android)
+node test/admin.test.js    # admin paneli: raqamlar ko'rinishga qaytganda yangilanadi
 ```
 
-Uchalasi ham `.github/workflows/test.yml` orqali **har push va PR'da avtomatik** ishlaydi
+Beshtasi ham `.github/workflows/test.yml` orqali **har push va PR'da avtomatik** ishlaydi
 (u yerda `python -m compileall bot` ham bor — sintaksis xatosi Railway'ga chiqmasdan ushlanadi).
 
 `sync.test.js` ataylab takrorlangan ro'yxatlarni ikki tomondan o'qib solishtiradi. Bu loyihadagi

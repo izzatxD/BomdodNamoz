@@ -216,6 +216,9 @@ def _parse_day(value) -> date | None:
 
 
 def _cors(resp: web.StreamResponse, origin: str) -> web.StreamResponse:
+    # Javoblar jonli hisob — oraliq kesh yoki WebView eski nusxani qaytarmasin.
+    # (Mini App admin sahifasi /api/admin/stats ni GET bilan so'raydi.)
+    resp.headers["Cache-Control"] = "no-store"
     resp.headers["Access-Control-Allow-Origin"] = origin
     resp.headers["Access-Control-Allow-Headers"] = "Content-Type, X-Init-Data"
     resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"

@@ -62,6 +62,14 @@ window.Qazo = (function () {
   $("#plan-plus").addEventListener("click", () => { const q = data(); q.plan = Math.min(20, q.plan + 1); save(q); render(); });
   $("#qazo-reset").addEventListener("click", () => App.confirm("Barcha qazo hisobi o'chirilsinmi?", () => { save({ left: {}, total: {}, plan: 1 }); render(); }));
 
+  //  Namoz bo'limidagi ro'yxat uchun — ichkariga kirmasdan holat ko'rinsin
+  function summary() {
+    const q = data();
+    const left = PRAYERS.reduce((n, p) => n + (q.left[p.id] || 0), 0);
+    const total = PRAYERS.reduce((n, p) => n + (q.total[p.id] || 0), 0);
+    return { left, total, done: total - left, plan: q.plan || 1 };
+  }
+
   App.onTab("qazo", render);
-  return { render };
+  return { render, summary };
 })();

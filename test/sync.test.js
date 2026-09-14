@@ -191,5 +191,43 @@ console.log("\n6) Reyting izohlari Nur.W dan olinadimi (raqam qo'lda yozilmaganm
   ok("hint matnlarida qo'lda yozilgan ball yo'q", hardcoded.length === 0, hardcoded.join("\n       "));
 }
 
+// ---------- 7) Navigatsiya: app.js dagi ekranlar index.html da bormi ----------
+//  Yangi bo'lim qo'shilganda eng oson unutiladigan narsa — <section id="tab-..."> yozish.
+//  Unda tugma bosiladi, sarlavha almashadi, lekin ekran BO'SH chiqadi va hech qanday
+//  xato ham berilmaydi. Shuning uchun ikki ro'yxatni solishtiramiz.
+console.log("\n7) Navigatsiya — ekranlar va ularning «otasi» joyidami");
+{
+  const app = fs.readFileSync(path.join(WEB, "app.js"), "utf8");
+  const html = fs.readFileSync(path.join(WEB, "index.html"), "utf8");
+
+  const line = (name) => (app.match(new RegExp(`const ${name} = \\{([^\\n]*)\\}`)) || [])[1] || "";
+  const keys = (name) => [...line(name).matchAll(/(\w+)\s*:/g)].map((m) => m[1]);
+
+  const tabs = keys("titles");
+  const sections = [...html.matchAll(/<section id="tab-([\w-]+)"/g)].map((m) => m[1]);
+  const navButtons = [...html.matchAll(/class="nav[^"]*" data-tab="([\w-]+)"/g)].map((m) => m[1]);
+
+  ok(`app.js da ${tabs.length} ta ekran e'lon qilingan`, tabs.length > 0, tabs.join(", "));
+  const missing = tabs.filter((t) => sections.indexOf(t) < 0);
+  ok("har bir ekranning <section> i bor", missing.length === 0, "yo'q: " + missing.join(", "));
+  const orphan = sections.filter((t) => tabs.indexOf(t) < 0);
+  ok("ortiqcha <section> yo'q", orphan.length === 0, "sarlavhasiz: " + orphan.join(", "));
+
+  // navParent: ichki ekranning otasi mavjud ekran bo'lishi kerak, aks holda
+  // orqaga tugmasi va yonib turgan menyu noto'g'ri joyni ko'rsatadi
+  const parents = [...line("navParent").matchAll(/(\w+)\s*:\s*"(\w+)"/g)].map((m) => ({ tab: m[1], parent: m[2] }));
+  const badChild = parents.filter((p) => tabs.indexOf(p.tab) < 0);
+  const badParent = parents.filter((p) => tabs.indexOf(p.parent) < 0);
+  ok("navParent dagi ekranlar mavjud", badChild.length === 0, badChild.map((p) => p.tab).join(", "));
+  ok("navParent dagi «ota» ekranlar mavjud", badParent.length === 0, badParent.map((p) => p.parent).join(", "));
+
+  // Pastki menyudagi 5 ta manzilning o'zi hech kimning ichida bo'lmasligi kerak
+  const nested = navButtons.filter((b) => parents.some((p) => p.tab === b));
+  ok(`pastki menyudagi ${navButtons.length} ta manzil ildizda turibdi`, nested.length === 0, nested.join(", "));
+  // Qolgan hamma ekranning otasi bo'lishi shart — aks holda orqaga tugmasi bosh sahifaga otib yuboradi
+  const rootless = tabs.filter((t) => navButtons.indexOf(t) < 0 && !parents.some((p) => p.tab === t));
+  ok("ichki ekranlarning hammasida «ota» bor", rootless.length === 0, "otasiz: " + rootless.join(", "));
+}
+
 console.log(failed ? `\n${failed} ta sinov muvaffaqiyatsiz` : "\nHamma sinov o'tdi");
 process.exit(failed ? 1 : 0);

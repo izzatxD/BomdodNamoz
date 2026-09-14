@@ -131,5 +131,34 @@ console.log("\n8) Darajalar");
   ok("eng yuqorida next yo'q", top.next === null && top.pct === 1);
 }
 
+// ---------- 9) Zikr matnlari to'liqmi ----------
+//  Arabchani hamma ham o'qiy olmaydi: har bir zikrda ARABCHA, O'QILISHI va MA'NOSI
+//  bo'lishi shart. Bir vaqtlar tasbih zikrlarida «o'qilishi» umuman yo'q edi —
+//  Salavotning arabchasi va ma'nosi bor edi-yu, uni qanday aytish yozilmagandi.
+console.log("\n9) Zikr matnlari — arabcha, o'qilishi, ma'nosi");
+{
+  const { Z } = env();
+  const groups = [["tong", Z.tong], ["tun", Z.tun], ["tasbih", Z.tasbih]];
+  for (const [name, list] of groups) {
+    // sameAs — tungi ro'yxatdagi zikr tongdagidan to'liq nusxa oladi, o'zida matn bo'lmaydi
+    const own = list.filter((z) => !z.sameAs);
+    const noArabic = own.filter((z) => !z.arabic);
+    const noLatin = own.filter((z) => !z.latin);
+    const noMeaning = own.filter((z) => !z.meaning);
+    ok(`${name}: ${own.length} ta zikrda arabcha bor`, noArabic.length === 0, noArabic.map((z) => z.id).join(", "));
+    ok(`${name}: hammasida o'qilishi bor`, noLatin.length === 0, noLatin.map((z) => z.id).join(", "));
+    ok(`${name}: hammasida ma'nosi bor`, noMeaning.length === 0, noMeaning.map((z) => z.id).join(", "));
+    const same = own.filter((z) => z.latin && z.meaning && z.latin === z.meaning);
+    ok(`${name}: o'qilishi va ma'nosi aralashib ketmagan`, same.length === 0, same.map((z) => z.id).join(", "));
+  }
+  // Tasbihda har bir zikrning maqsadi musbat bo'lishi kerak — hisoblagich shunga tayanadi
+  const badTarget = Z.tasbih.filter((t) => !(t.target > 0));
+  ok("tasbih maqsadlari musbat", badTarget.length === 0, badTarget.map((t) => t.id).join(", "));
+  // Chipdagi qisqa nom bilan haqiqiy o'qilishi boshqa-boshqa bo'lishi mumkin (masalan «Salavot»),
+  // shuning uchun kartada nomni emas, aynan `latin` ni ko'rsatish shart
+  const zikrSrc = require("fs").readFileSync(path.join(W, "zikr.js"), "utf8");
+  ok("tasbih kartasida o'qilishi chiqariladi", /O'qilishi[\s\S]{0,200}z\.latin/.test(zikrSrc));
+}
+
 console.log(failed ? `\n${failed} ta sinov muvaffaqiyatsiz` : "\nHamma sinov o'tdi");
 process.exit(failed ? 1 : 0);
